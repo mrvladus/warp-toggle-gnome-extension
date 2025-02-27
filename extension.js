@@ -35,44 +35,60 @@ import {
  * Checks if the given command exists in the system PATH.
  */
 function commandExists(command) {
-  let fullPath = GLib.find_program_in_path(command);
-  if (fullPath) {
-    return true;
-  }
-  return false;
+  return GLib.find_program_in_path(command) ? true : false;
 }
 
 /**
  * Executes a shell command and returns its stdout output.
  */
-function runCommand(cmd) {
-  try {
-    let [success, stdout, stderr, exit_status] =
-      GLib.spawn_command_line_sync(cmd);
-    let decoder = new TextDecoder();
-    if (!success) {
-      console.log(
-        `Command failed with error output: ${stderr && decoder.decode(stderr)}`,
-      );
-      return null;
+async function runCommand(cmd) {
+  return new Promise((resolve, reject) => {
+    try {
+      console.log(`Executing command: warp-cli ${cmd}`);
+      const proc = new Gio.Subprocess({
+        argv: ["warp-cli", cmd],
+        flags:
+          Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE,
+      });
+
+      proc.init(null);
+
+      proc.communicate_utf8_async(null, null, (proc, res) => {
+        try {
+          let [ok, stdout, stderr] = proc.communicate_utf8_finish(res);
+          if (!ok || proc.get_exit_status() !== 0) {
+            console.error("Failed to execute warp-cli:", cmd, stderr);
+            reject(stderr);
+            return;
+          }
+          resolve(stdout ? stdout.trim() : "");
+        } catch (e) {
+          reject(e);
+        }
+      });
+    } catch (e) {
+      reject(e);
     }
-    return decoder.decode(stdout).trim();
-  } catch (e) {
-    console.log(e);
-    return null;
-  }
+  });
 }
 
 /**
  * Checks if Warp is connected by parsing the output of "warp-cli status".
  * You might want to adjust the parsing according to your warp-cli version.
  */
-function isWarpConnected() {
-  let status = runCommand("warp-cli status");
-  if (status && status.toLowerCase().includes("connected")) {
-    return true;
+async function isWarpConnected() {
+  try {
+    const status = await runCommand("status");
+    if (!status) {
+      console.log("Warp status command returned empty response.");
+      return false;
+    }
+    console.log("Warp status:", status);
+    return status.toLowerCase().includes("connected");
+  } catch (err) {
+    console.error("Error checking Warp status:", err);
+    return false;
   }
-  return false;
 }
 
 const WarpToggle = GObject.registerClass(
@@ -82,31 +98,21 @@ const WarpToggle = GObject.registerClass(
         title: _("WARP"),
         iconName: "network-vpn-symbolic",
         toggleMode: true,
-        checked: isWarpConnected(),
+        checked: false,
       });
+      // Set button state
+      isWarpConnected()
+        .then((connected) => {
+          this.checked = connected;
+        })
+        .catch((err) => {
+          console.error("Error checking Warp status:", err);
+        });
 
       // Monitor state changes
       this.connect("clicked", () => {
-        this._toggleWarp();
+        runCommand(this.checked ? "connect" : "disconnect");
       });
-    }
-
-    /**
-     * Executes connect/disconnect command based on the current state.
-     */
-    _toggleWarp() {
-      // Read the current checked state.
-      let checked = this.checked;
-      let cmd = checked ? "warp-cli connect" : "warp-cli disconnect";
-      console.log(`Executing command: ${cmd}`);
-      let result = runCommand(cmd);
-      if (result) {
-        console.log(`Command output: ${result}`);
-      } else {
-        console.log(
-          "Command did not return any output. Check logs for errors.",
-        );
-      }
     }
   },
 );

@@ -5,16 +5,16 @@
 ### Install
 
 1. Install [warp-cli](https://developers.cloudflare.com/warp-client/get-started/linux/)
-2. Clone repo:
-
-```bash
-git clone https:github.com/mrvladus/warp-toggle-gnome-extension && cd warp-toggle-gnome-extension
-```
-
-3. Register new connection:
+2. Register new connection:
 
 ```bash
 $ warp-cli registration new
+```
+
+3. Clone repo:
+
+```bash
+git clone https:github.com/mrvladus/warp-toggle-gnome-extension && cd warp-toggle-gnome-extension
 ```
 
 4. Install extension:

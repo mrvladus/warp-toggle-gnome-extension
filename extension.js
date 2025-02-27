@@ -51,7 +51,7 @@ function runCommand(cmd) {
       GLib.spawn_command_line_sync(cmd);
     let decoder = new TextDecoder();
     if (!success) {
-      log(
+      console.log(
         `Command failed with error output: ${stderr && decoder.decode(stderr)}`,
       );
       return null;
@@ -84,8 +84,6 @@ const WarpToggle = GObject.registerClass(
         toggleMode: true,
         checked: isWarpConnected(),
       });
-      var out = runCommand("warp-cli status");
-      console.log(out);
 
       // Monitor state changes
       this.connect("clicked", () => {
@@ -100,12 +98,14 @@ const WarpToggle = GObject.registerClass(
       // Read the current checked state.
       let checked = this.checked;
       let cmd = checked ? "warp-cli connect" : "warp-cli disconnect";
-      log(`Executing command: ${cmd}`);
+      console.log(`Executing command: ${cmd}`);
       let result = runCommand(cmd);
       if (result) {
-        log(`Command output: ${result}`);
+        console.log(`Command output: ${result}`);
       } else {
-        log("Command did not return any output. Check logs for errors.");
+        console.log(
+          "Command did not return any output. Check logs for errors.",
+        );
       }
     }
   },
@@ -128,6 +128,11 @@ const WarpIndicator = GObject.registerClass(
       );
       this.quickSettingsItems.push(toggle);
     }
+
+    destroy() {
+      this.quickSettingsItems.forEach((item) => item.destroy());
+      super.destroy();
+    }
   },
 );
 
@@ -135,7 +140,7 @@ export default class WARPExtension extends Extension {
   enable() {
     // Check if warp-cli exists before executing.
     if (!commandExists("warp-cli")) {
-      log("warp-cli command not found.");
+      console.log("warp-cli command not found.");
       return;
     }
 
@@ -144,7 +149,6 @@ export default class WARPExtension extends Extension {
   }
 
   disable() {
-    this._indicator.quickSettingsItems.forEach((item) => item.destroy());
     this._indicator.destroy();
     this._indicator = null;
   }

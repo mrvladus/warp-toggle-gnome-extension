@@ -8,7 +8,7 @@
 2. Register new connection:
 
 ```bash
-$ warp-cli registration new
+warp-cli registration new
 ```
 
 3. Clone repo:

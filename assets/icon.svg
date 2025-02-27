@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg height="128px" viewBox="0 0 128 128" width="128px" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <linearGradient id="a" gradientUnits="userSpaceOnUse" x1="67.5" x2="67.5" y1="36.5" y2="139.5">
+        <stop offset="0" stop-color="#ffffff"/>
+        <stop offset="0.322825" stop-color="#ffffff"/>
+        <stop offset="1" stop-color="#bfbfbf"/>
+    </linearGradient>
+    <path d="m 72 63 v -48 h -8 s 0 16 -16 16 v 6 h 12 v 26 z m 0 0" fill="#ffa348"/>
+    <path d="m 72 60 v -48 h -8 s 0 16 -16 16 v 6 h 12 v 26 z m 0 0" fill="#ffbe6f"/>
+    <path d="m 96 88 c 0 15.464844 -12.535156 28 -28 28 s -28 -12.535156 -28 -28 s 12.535156 -28 28 -28 s 28 12.535156 28 28 z m 23 14 c 0 9.941406 -8.058594 18 -18 18 s -18 -8.058594 -18 -18 s 8.058594 -18 18 -18 s 18 8.058594 18 18 z m -63 -6 c 0 11.046875 -8.953125 20 -20 20 s -20 -8.953125 -20 -20 s 8.953125 -20 20 -20 s 20 8.953125 20 20 z m 0 0" fill="#babab5"/>
+    <path d="m 96 86 c 0 15.464844 -12.535156 28 -28 28 s -28 -12.535156 -28 -28 s 12.535156 -28 28 -28 s 28 12.535156 28 28 z m 23 14 c 0 9.941406 -8.058594 18 -18 18 s -18 -8.058594 -18 -18 s 8.058594 -18 18 -18 s 18 8.058594 18 18 z m -63 -6 c 0 11.046875 -8.953125 20 -20 20 s -20 -8.953125 -20 -20 s 8.953125 -20 20 -20 s 20 8.953125 20 20 z m 0 0" fill="url(#a)"/>
+</svg>

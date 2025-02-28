@@ -31,16 +31,7 @@ import {
   SystemIndicator,
 } from "resource:///org/gnome/shell/ui/quickSettings.js";
 
-/**
- * Checks if the given command exists in the system PATH.
- */
-function commandExists(command) {
-  return GLib.find_program_in_path(command) ? true : false;
-}
-
-/**
- * Executes a shell command and returns its stdout output.
- */
+// Executes a shell command and returns its stdout output.
 async function runCommand(cmd) {
   return new Promise((resolve, reject) => {
     try {
@@ -50,9 +41,7 @@ async function runCommand(cmd) {
         flags:
           Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE,
       });
-
       proc.init(null);
-
       proc.communicate_utf8_async(null, null, (proc, res) => {
         try {
           let [ok, stdout, stderr] = proc.communicate_utf8_finish(res);
@@ -72,19 +61,17 @@ async function runCommand(cmd) {
   });
 }
 
-/**
- * Checks if Warp is connected by parsing the output of "warp-cli status".
- * You might want to adjust the parsing according to your warp-cli version.
- */
+// Checks if Warp is connected by parsing the output of "warp-cli status".
 async function isWarpConnected() {
   try {
     const status = await runCommand("status");
     if (!status) {
-      console.log("Warp status command returned empty response.");
+      console.error("Warp status command returned empty response.");
       return false;
     }
     console.log("Warp status:", status);
-    return status.toLowerCase().includes("connected");
+    let res = status.toLowerCase();
+    return res.includes("connected") || res.includes("connecting");
   } catch (err) {
     console.error("Error checking Warp status:", err);
     return false;
@@ -145,8 +132,9 @@ const WarpIndicator = GObject.registerClass(
 export default class WARPExtension extends Extension {
   enable() {
     // Check if warp-cli exists before executing.
-    if (!commandExists("warp-cli")) {
-      console.log("warp-cli command not found.");
+    if (!(GLib.find_program_in_path("warp-cli") ? true : false)) {
+      console.error("warp-cli command not found");
+      Main.notifyError("WARP Toggle", "warp-cli command not found");
       return;
     }
 
@@ -155,7 +143,9 @@ export default class WARPExtension extends Extension {
   }
 
   disable() {
-    this._indicator.destroy();
-    this._indicator = null;
+    if (this._indicator) {
+      this._indicator.destroy();
+      this._indicator = null;
+    }
   }
 }

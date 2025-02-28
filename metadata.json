@@ -3,5 +3,6 @@
   "description": "Toggle Cloudflare WARP connection from Quick Settings menu",
   "uuid": "warptoggle@mrvladus.github.io",
   "url": "https://github.com/mrvladus/warp-toggle-gnome-extension",
-  "shell-version": ["45", "46", "47"]
+  "shell-version": ["45", "46", "47"],
+  "version": "1.0"
 }

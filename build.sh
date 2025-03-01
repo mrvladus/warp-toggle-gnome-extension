@@ -22,6 +22,7 @@ fi
 
 if [ "$1" == "zip" ]; then
     echo "Creating zip"
+    rm -rf "${NAME}.zip"
     zip "${NAME}.zip" extension.js metadata.json
     echo "Success"
     exit 0

@@ -61,23 +61,6 @@ async function runCommand(cmd) {
   });
 }
 
-// Checks if Warp is connected by parsing the output of "warp-cli status".
-async function isWarpConnected() {
-  try {
-    const status = await runCommand("status");
-    if (!status) {
-      console.error("Warp status command returned empty response.");
-      return false;
-    }
-    console.log("Warp status:", status);
-    let res = status.toLowerCase();
-    return res.includes("connected") || res.includes("connecting");
-  } catch (err) {
-    console.error("Error checking Warp status:", err);
-    return false;
-  }
-}
-
 const WarpToggle = GObject.registerClass(
   class WarpToggle extends QuickToggle {
     constructor() {
@@ -87,19 +70,81 @@ const WarpToggle = GObject.registerClass(
         toggleMode: true,
         checked: false,
       });
-      // Set button state
-      isWarpConnected()
-        .then((connected) => {
-          this.checked = connected;
-        })
-        .catch((err) => {
-          console.error("Error checking Warp status:", err);
-        });
+
+      this._attempts = 0;
+      this._maxAttempts = 5;
+      this._statusCheckId = null; // Store timeout ID
+
+      this._updateStatus(); // Initial check
+      this._startCheckingStatus(); // Start periodic updates
 
       // Monitor state changes
       this.connect("clicked", () => {
+        this._attempts = 0;
         runCommand(this.checked ? "connect" : "disconnect");
+        this._startCheckingStatus(); // Restart checking when user toggles
       });
+    }
+
+    async _updateStatus() {
+      try {
+        const connected = await this._isWarpConnected();
+        if (connected) {
+          this._attempts = 0;
+          this.checked = true;
+          this._stopCheckingStatus(); // Stop updates when connected
+        } else {
+          this._attempts++;
+          this.checked = false;
+
+          if (this._attempts >= this._maxAttempts) {
+            Main.notifyError("WARP Toggle", "Can't connect to WARP");
+            this._attempts = 0;
+          }
+        }
+      } catch (err) {
+        console.error("Error checking Warp status:", err);
+      }
+    }
+
+    _startCheckingStatus() {
+      if (this._statusCheckId) return; // Prevent duplicate timers
+      this._statusCheckId = GLib.timeout_add_seconds(
+        GLib.PRIORITY_DEFAULT,
+        10,
+        () => {
+          this._updateStatus();
+          return GLib.SOURCE_CONTINUE;
+        },
+      );
+    }
+
+    _stopCheckingStatus() {
+      if (this._statusCheckId) {
+        GLib.source_remove(this._statusCheckId);
+        this._statusCheckId = null;
+      }
+    }
+
+    async _isWarpConnected() {
+      try {
+        const status = await runCommand("status");
+        if (!status) {
+          console.error("Warp status command returned empty response.");
+          return false;
+        }
+        console.log("Warp status:", status);
+        const res = status.toLowerCase();
+        return res.includes("connected") || res.includes("connecting");
+      } catch (err) {
+        console.error("Error checking Warp status:", err);
+        return false;
+      }
+    }
+
+    destroy() {
+      this._stopCheckingStatus();
+      super.destroy();
     }
   },
 );
@@ -109,9 +154,11 @@ const WarpIndicator = GObject.registerClass(
     constructor() {
       super();
 
+      // Create the indicator icon
       this._indicator = this._addIndicator();
       this._indicator.iconName = "network-vpn-symbolic";
 
+      // Create the toggle button and bind its visibility to connection state
       const toggle = new WarpToggle();
       toggle.bind_property(
         "checked",
@@ -138,6 +185,7 @@ export default class WARPExtension extends Extension {
       return;
     }
 
+    // Add the indicator to the system panel
     this._indicator = new WarpIndicator();
     Main.panel.statusArea.quickSettings.addExternalIndicator(this._indicator);
   }

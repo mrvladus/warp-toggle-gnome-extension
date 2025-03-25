@@ -4,6 +4,8 @@
 
 ### Install
 
+#### Prerequisite
+
 1. Install [warp-cli](https://developers.cloudflare.com/warp-client/get-started/linux/)
 2. Register new connection:
 
@@ -11,21 +13,30 @@
 warp-cli registration new
 ```
 
-3. Clone repo:
+#### Using Extension Manager
+
+1. Download [Extension Manager](https://flathub.org/apps/com.mattjakeman.ExtensionManager) flatpak
+2. Search for `WARP Toggle` extension and click `Install`
+
+#### Using GNOME Extensions website
+
+Go to [this](https://extensions.gnome.org/extension/7905/warp-toggle/) page and follow click `Install` button.
+
+#### Installing from source
+
+1. Clone repo:
 
 ```bash
 git clone https:github.com/mrvladus/warp-toggle-gnome-extension && cd warp-toggle-gnome-extension
 ```
 
-4. Install extension:
+2. Install extension:
 
 ```bash
 ./build.sh install
 ```
 
-### Uninstall
-
-To delete extension run:
+3. To delete extension run:
 
 ```bash
 ./build.sh uninstall

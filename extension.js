@@ -82,7 +82,7 @@ const WarpToggle = GObject.registerClass(
       this.connect("clicked", () => {
         this._attempts = 0;
         runCommand(this.checked ? "connect" : "disconnect");
-        this._startCheckingStatus(); // Restart checking when user toggles
+        if (this.checked) this._startCheckingStatus(); // Restart checking when user toggles
       });
     }
 

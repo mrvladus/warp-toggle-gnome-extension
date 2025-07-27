@@ -33,13 +33,13 @@ git clone https:github.com/mrvladus/warp-toggle-gnome-extension && cd warp-toggl
 2. Install extension:
 
 ```bash
-./build.sh install
+./build install
 ```
 
-3. To delete extension run:
+3. To uninstall extension run:
 
 ```bash
-./build.sh uninstall
+./build uninstall
 ```
 
 Or manually remove this directory: `~/.local/share/gnome-shell/extensions/warptoggle@mrvladus.github.io`

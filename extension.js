@@ -38,6 +38,7 @@ const STATUS_CHECK_INTERVAL_SECONDS = 10;
 const STATE_CONNECTED = "connected";
 const STATE_CONNECTING = "connecting";
 const STATE_DISCONNECTED = "disconnected";
+const STATE_DISABLED = "disabled";
 const STATE_OFFLINE = "offline";
 const STATE_ERROR = "error";
 
@@ -45,6 +46,7 @@ const STATE_ERROR = "error";
 const ICON_CONNECTED = "network-vpn-symbolic";
 const ICON_CONNECTING = "network-vpn-acquiring-symbolic";
 const ICON_DISCONNECTED = "network-vpn-disconnected-symbolic";
+const ICON_DISABLED = "network-vpn-disabled-symbolic";
 const ICON_OFFLINE = "network-vpn-offline-symbolic";
 const ICON_ERROR = "network-vpn-error-symbolic";
 
@@ -61,14 +63,20 @@ const COMMAND_DISCONNECT = "disconnect";
 // error strings
 const WARP_CLI_NOT_FOUND = "warp-cli command not found";
 
-const OFFLINE_ERROR_PATTERNS = [
+const DISABLED_ERROR_PATTERNS = [
   "no such file or directory",
   "failed to execute child process",
   "unable to connect",
   "daemon",
+  "service not running",
+];
+
+const OFFLINE_ERROR_PATTERNS = [
   "network is unreachable",
   "offline",
   "timed out",
+  "could not resolve host",
+  "name or service not known",
 ];
 
 function getStateAppearance(state) {
@@ -79,6 +87,8 @@ function getStateAppearance(state) {
       return { iconName: ICON_CONNECTING, checked: true, visible: true };
     case STATE_DISCONNECTED:
       return { iconName: ICON_DISCONNECTED, checked: false, visible: true };
+    case STATE_DISABLED:
+      return { iconName: ICON_DISABLED, checked: false, visible: true };
     case STATE_OFFLINE:
       return { iconName: ICON_OFFLINE, checked: false, visible: true };
     case STATE_ERROR:
@@ -102,6 +112,9 @@ function parseWarpStatus(statusOutput) {
   if (status.includes(STATUS_CONNECTED)) {
     return STATE_CONNECTED;
   }
+  if (DISABLED_ERROR_PATTERNS.some((pattern) => status.includes(pattern))) {
+    return STATE_DISABLED;
+  }
   if (OFFLINE_ERROR_PATTERNS.some((pattern) => status.includes(pattern))) {
     return STATE_OFFLINE;
   }
@@ -111,6 +124,9 @@ function parseWarpStatus(statusOutput) {
 
 function classifyWarpFailure(err) {
   const message = `${err}`.toLowerCase();
+  if (DISABLED_ERROR_PATTERNS.some((pattern) => message.includes(pattern))) {
+    return STATE_DISABLED;
+  }
   if (OFFLINE_ERROR_PATTERNS.some((pattern) => message.includes(pattern))) {
     return STATE_OFFLINE;
   }
@@ -161,7 +177,7 @@ const WarpToggle = GObject.registerClass(
       this._statusCheckId = null; // Store timeout ID
 
       if (!this._cliAvailable) {
-        this._setState(STATE_OFFLINE);
+        this._setState(STATE_DISABLED);
         return;
       }
 
@@ -269,7 +285,6 @@ export default class WARPExtension extends Extension {
     if (!cliAvailable) {
       console.error(WARP_CLI_NOT_FOUND);
       Main.notifyError(`${WARP_TITLE} Toggle`, WARP_CLI_NOT_FOUND);
-      return;
     }
 
     // Add the indicator to the system panel

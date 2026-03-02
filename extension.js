@@ -32,12 +32,25 @@ import {
 } from "resource:///org/gnome/shell/ui/quickSettings.js";
 
 const WARP_TITLE = "WARP";
-const WARP_ICON = "network-vpn-symbolic";
 const STATUS_CHECK_INTERVAL_SECONDS = 10;
 
-// satuses
-const STATUS_CONNECTED = "Connected";
-const STATUS_CONNECTING = "Connecting";
+// states
+const STATE_CONNECTED = "connected";
+const STATE_CONNECTING = "connecting";
+const STATE_DISCONNECTED = "disconnected";
+const STATE_OFFLINE = "offline";
+const STATE_ERROR = "error";
+
+// icons and states
+const ICON_CONNECTED = "network-vpn-symbolic";
+const ICON_CONNECTING = "network-vpn-acquiring-symbolic";
+const ICON_DISCONNECTED = "network-vpn-disconnected-symbolic";
+const ICON_OFFLINE = "network-vpn-offline-symbolic";
+const ICON_ERROR = "network-vpn-error-symbolic";
+
+const STATUS_CONNECTED = "connected";
+const STATUS_CONNECTING = "connecting";
+const STATUS_DISCONNECTED = "disconnected";
 
 // command parameters
 const WARP_CLI = "warp-cli";
@@ -47,6 +60,62 @@ const COMMAND_DISCONNECT = "disconnect";
 
 // error strings
 const WARP_CLI_NOT_FOUND = "warp-cli command not found";
+
+const OFFLINE_ERROR_PATTERNS = [
+  "no such file or directory",
+  "failed to execute child process",
+  "unable to connect",
+  "daemon",
+  "network is unreachable",
+  "offline",
+  "timed out",
+];
+
+function getStateAppearance(state) {
+  switch (state) {
+    case STATE_CONNECTED:
+      return { iconName: ICON_CONNECTED, checked: true, visible: true };
+    case STATE_CONNECTING:
+      return { iconName: ICON_CONNECTING, checked: true, visible: true };
+    case STATE_DISCONNECTED:
+      return { iconName: ICON_DISCONNECTED, checked: false, visible: true };
+    case STATE_OFFLINE:
+      return { iconName: ICON_OFFLINE, checked: false, visible: true };
+    case STATE_ERROR:
+    default:
+      return { iconName: ICON_ERROR, checked: false, visible: true };
+  }
+}
+
+function parseWarpStatus(statusOutput) {
+  if (!statusOutput) {
+    return STATE_ERROR;
+  }
+
+  const status = statusOutput.toLowerCase();
+  if (status.includes(STATUS_DISCONNECTED)) {
+    return STATE_DISCONNECTED;
+  }
+  if (status.includes(STATUS_CONNECTING)) {
+    return STATE_CONNECTING;
+  }
+  if (status.includes(STATUS_CONNECTED)) {
+    return STATE_CONNECTED;
+  }
+  if (OFFLINE_ERROR_PATTERNS.some((pattern) => status.includes(pattern))) {
+    return STATE_OFFLINE;
+  }
+
+  return STATE_ERROR;
+}
+
+function classifyWarpFailure(err) {
+  const message = `${err}`.toLowerCase();
+  if (OFFLINE_ERROR_PATTERNS.some((pattern) => message.includes(pattern))) {
+    return STATE_OFFLINE;
+  }
+  return STATE_ERROR;
+}
 
 // Executes a shell command and returns its stdout output.
 async function runCommand(cmd) {
@@ -78,30 +147,68 @@ async function runCommand(cmd) {
 
 const WarpToggle = GObject.registerClass(
   class WarpToggle extends QuickToggle {
-    constructor() {
+    constructor(cliAvailable, onStateChange) {
       super({
         title: _(WARP_TITLE),
-        iconName: WARP_ICON,
+        iconName: ICON_DISCONNECTED,
         toggleMode: true,
         checked: false,
       });
 
+      this._onStateChange = onStateChange;
+      this._state = null;
+      this._cliAvailable = cliAvailable;
       this._statusCheckId = null; // Store timeout ID
+
+      if (!this._cliAvailable) {
+        this._setState(STATE_OFFLINE);
+        return;
+      }
+
+      this._setState(STATE_DISCONNECTED);
       this._updateStatus(); // Initial check
       this._startCheckingStatus(); // Start periodic updates
 
       // Monitor button state changes
-      this.connect("clicked", () => {
-        runCommand(this.checked ? COMMAND_CONNECT : COMMAND_DISCONNECT);
-        if (this.checked) this._startCheckingStatus(); // Restart checking when user toggles
+      this.connect("clicked", async () => {
+        const command = this.checked ? COMMAND_CONNECT : COMMAND_DISCONNECT;
+        this._setState(
+          command === COMMAND_CONNECT ? STATE_CONNECTING : STATE_DISCONNECTED,
+        );
+
+        try {
+          await runCommand(command);
+        } catch (err) {
+          this._setState(classifyWarpFailure(err));
+          return;
+        }
+
+        await this._updateStatus();
       });
+    }
+
+    _setState(state) {
+      if (this._state === state) {
+        return;
+      }
+
+      this._state = state;
+      const appearance = getStateAppearance(state);
+      this.iconName = appearance.iconName;
+      this.checked = appearance.checked;
+      this.visible = appearance.visible;
+
+      if (this._onStateChange) {
+        this._onStateChange(appearance);
+      }
     }
 
     async _updateStatus() {
       try {
-        this.checked = await this._isWarpConnected();
+        const state = await this._getWarpState();
+        this._setState(state);
       } catch (err) {
-        // Silent failure for periodic check
+        this._setState(classifyWarpFailure(err));
       }
     }
 
@@ -117,18 +224,9 @@ const WarpToggle = GObject.registerClass(
       );
     }
 
-    async _isWarpConnected() {
-      try {
-        const status = await runCommand(COMMAND_STATUS);
-        if (!status) {
-          return false;
-        }
-        return (
-          status.includes(STATUS_CONNECTED) || status.includes(STATUS_CONNECTING)
-        );
-      } catch (err) {
-        return false;
-      }
+    async _getWarpState() {
+      const status = await runCommand(COMMAND_STATUS);
+      return parseWarpStatus(status);
     }
 
     destroy() {
@@ -143,20 +241,19 @@ const WarpToggle = GObject.registerClass(
 
 const WarpIndicator = GObject.registerClass(
   class WarpIndicator extends SystemIndicator {
-    constructor() {
+    constructor(cliAvailable) {
       super();
+
       // Create the indicator icon
       this._indicator = this._addIndicator();
-      this._indicator.iconName = WARP_ICON;
-      // Create the toggle button and bind its visibility to connection state
-      const toggle = new WarpToggle();
-      toggle.bind_property(
-        "checked",
-        this._indicator,
-        "visible",
-        GObject.BindingFlags.SYNC_CREATE,
-      );
-      this.quickSettingsItems.push(toggle);
+      this._indicator.visible = true;
+
+      // Create the toggle button and sync indicator appearance with its state.
+      this._toggle = new WarpToggle(cliAvailable, (appearance) => {
+        this._indicator.iconName = appearance.iconName;
+        this._indicator.visible = appearance.visible;
+      });
+      this.quickSettingsItems.push(this._toggle);
     }
 
     destroy() {
@@ -168,14 +265,15 @@ const WarpIndicator = GObject.registerClass(
 
 export default class WARPExtension extends Extension {
   enable() {
-    // Check if warp-cli exists before executing.
-    if (!(GLib.find_program_in_path(WARP_CLI) ? true : false)) {
+    const cliAvailable = Boolean(GLib.find_program_in_path(WARP_CLI));
+    if (!cliAvailable) {
       console.error(WARP_CLI_NOT_FOUND);
       Main.notifyError(`${WARP_TITLE} Toggle`, WARP_CLI_NOT_FOUND);
       return;
     }
+
     // Add the indicator to the system panel
-    this._indicator = new WarpIndicator();
+    this._indicator = new WarpIndicator(cliAvailable);
     Main.panel.statusArea.quickSettings.addExternalIndicator(this._indicator);
   }
 

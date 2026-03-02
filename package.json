@@ -1,6 +1,18 @@
 {
+  "name": "warp-toggle-gnome-extension",
+  "private": true,
+  "scripts": {
+    "build": "./build zip",
+    "build:install": "./build install",
+    "build:uninstall": "./build uninstall",
+    "build:zip": "./build zip",
+    "lint": "eslint extension.js"
+  },
   "dependencies": {
-    "@girs/gjs": "^4.0.0-beta.21",
-    "@girs/gnome-shell": "^47.0.2"
+    "@girs/gjs": "^4.0.0-beta.39",
+    "@girs/gnome-shell": "^49.1.0"
+  },
+  "devDependencies": {
+    "eslint": "^10.0.2"
   }
 }

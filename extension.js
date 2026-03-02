@@ -35,7 +35,6 @@ import {
 async function runCommand(cmd) {
   return new Promise((resolve, reject) => {
     try {
-      console.log(`Executing command: warp-cli ${cmd}`);
       const proc = new Gio.Subprocess({
         argv: ["warp-cli", cmd],
         flags:
@@ -46,7 +45,6 @@ async function runCommand(cmd) {
         try {
           let [ok, stdout, stderr] = proc.communicate_utf8_finish(res);
           if (!ok || proc.get_exit_status() !== 0) {
-            console.error("Failed to execute warp-cli:", cmd, stderr);
             reject(stderr);
             return;
           }
@@ -86,7 +84,7 @@ const WarpToggle = GObject.registerClass(
       try {
         this.checked = await this._isWarpConnected();
       } catch (err) {
-        console.error("Error checking WARP status:", err);
+        // Silent failure for periodic check
       }
     }
 
@@ -107,12 +105,10 @@ const WarpToggle = GObject.registerClass(
       try {
         const status = await runCommand("status");
         if (!status) {
-          console.error("'warp-cli status' command returned empty response.");
           return false;
         }
         return status.includes("Connected") || status.includes("Connecting");
       } catch (err) {
-        console.error("Error checking WARP status:", err);
         return false;
       }
     }

@@ -1,4 +1,11 @@
+import json from "@eslint/json";
+
 export default [
+  {
+    files: ["metadata.json"],
+    language: "json/json",
+    ...json.configs.recommended,
+  },
   {
     files: ["extension.js"],
     languageOptions: {

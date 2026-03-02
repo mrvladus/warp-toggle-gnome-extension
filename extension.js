@@ -39,6 +39,7 @@ const STATE_CONNECTED = "connected";
 const STATE_CONNECTING = "connecting";
 const STATE_DISCONNECTED = "disconnected";
 const STATE_DISABLED = "disabled";
+const STATE_NO_ROUTE = "no_route";
 const STATE_OFFLINE = "offline";
 const STATE_ERROR = "error";
 
@@ -47,6 +48,7 @@ const ICON_CONNECTED = "network-vpn-symbolic";
 const ICON_CONNECTING = "network-vpn-acquiring-symbolic";
 const ICON_DISCONNECTED = "network-vpn-disconnected-symbolic";
 const ICON_DISABLED = "network-vpn-disabled-symbolic";
+const ICON_NO_ROUTE = "network-vpn-no-route-symbolic";
 const ICON_OFFLINE = "network-vpn-offline-symbolic";
 const ICON_ERROR = "network-vpn-error-symbolic";
 
@@ -71,12 +73,16 @@ const DISABLED_ERROR_PATTERNS = [
   "service not running",
 ];
 
-const OFFLINE_ERROR_PATTERNS = [
+const NO_ROUTE_ERROR_PATTERNS = [
   "network is unreachable",
-  "offline",
-  "timed out",
+  "no route to host",
   "could not resolve host",
   "name or service not known",
+];
+
+const OFFLINE_ERROR_PATTERNS = [
+  "offline",
+  "timed out",
 ];
 
 function getStateAppearance(state) {
@@ -89,6 +95,8 @@ function getStateAppearance(state) {
       return { iconName: ICON_DISCONNECTED, checked: false, visible: true };
     case STATE_DISABLED:
       return { iconName: ICON_DISABLED, checked: false, visible: true };
+    case STATE_NO_ROUTE:
+      return { iconName: ICON_NO_ROUTE, checked: false, visible: true };
     case STATE_OFFLINE:
       return { iconName: ICON_OFFLINE, checked: false, visible: true };
     case STATE_ERROR:
@@ -115,6 +123,9 @@ function parseWarpStatus(statusOutput) {
   if (DISABLED_ERROR_PATTERNS.some((pattern) => status.includes(pattern))) {
     return STATE_DISABLED;
   }
+  if (NO_ROUTE_ERROR_PATTERNS.some((pattern) => status.includes(pattern))) {
+    return STATE_NO_ROUTE;
+  }
   if (OFFLINE_ERROR_PATTERNS.some((pattern) => status.includes(pattern))) {
     return STATE_OFFLINE;
   }
@@ -126,6 +137,9 @@ function classifyWarpFailure(err) {
   const message = `${err}`.toLowerCase();
   if (DISABLED_ERROR_PATTERNS.some((pattern) => message.includes(pattern))) {
     return STATE_DISABLED;
+  }
+  if (NO_ROUTE_ERROR_PATTERNS.some((pattern) => message.includes(pattern))) {
+    return STATE_NO_ROUTE;
   }
   if (OFFLINE_ERROR_PATTERNS.some((pattern) => message.includes(pattern))) {
     return STATE_OFFLINE;

@@ -227,6 +227,8 @@ const WarpToggle = GObject.registerClass(
       this.iconName = appearance.iconName;
       this.checked = appearance.checked;
       this.visible = appearance.visible;
+      // QuickToggle is a Clutter actor; `reactive` controls whether it accepts pointer input.
+      this.reactive = state !== STATE_DISABLED;
 
       if (this._onStateChange) {
         this._onStateChange(appearance);

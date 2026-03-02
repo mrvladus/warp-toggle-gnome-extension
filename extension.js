@@ -31,12 +31,29 @@ import {
   SystemIndicator,
 } from "resource:///org/gnome/shell/ui/quickSettings.js";
 
+const WARP_TITLE = "WARP";
+const WARP_ICON = "network-vpn-symbolic";
+const STATUS_CHECK_INTERVAL_SECONDS = 10;
+
+// satuses
+const STATUS_CONNECTED = "Connected";
+const STATUS_CONNECTING = "Connecting";
+
+// command parameters
+const WARP_CLI = "warp-cli";
+const COMMAND_STATUS = "status";
+const COMMAND_CONNECT = "connect";
+const COMMAND_DISCONNECT = "disconnect";
+
+// error strings
+const WARP_CLI_NOT_FOUND = "warp-cli command not found";
+
 // Executes a shell command and returns its stdout output.
 async function runCommand(cmd) {
   return new Promise((resolve, reject) => {
     try {
       const proc = new Gio.Subprocess({
-        argv: ["warp-cli", cmd],
+        argv: [WARP_CLI, cmd],
         flags:
           Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE,
       });
@@ -63,8 +80,8 @@ const WarpToggle = GObject.registerClass(
   class WarpToggle extends QuickToggle {
     constructor() {
       super({
-        title: _("WARP"),
-        iconName: "network-vpn-symbolic",
+        title: _(WARP_TITLE),
+        iconName: WARP_ICON,
         toggleMode: true,
         checked: false,
       });
@@ -75,7 +92,7 @@ const WarpToggle = GObject.registerClass(
 
       // Monitor button state changes
       this.connect("clicked", () => {
-        runCommand(this.checked ? "connect" : "disconnect");
+        runCommand(this.checked ? COMMAND_CONNECT : COMMAND_DISCONNECT);
         if (this.checked) this._startCheckingStatus(); // Restart checking when user toggles
       });
     }
@@ -90,10 +107,9 @@ const WarpToggle = GObject.registerClass(
 
     _startCheckingStatus() {
       if (this._statusCheckId) return; // Prevent duplicate timers
-      const DELAY = 10;
       this._statusCheckId = GLib.timeout_add_seconds(
         GLib.PRIORITY_DEFAULT,
-        DELAY,
+        STATUS_CHECK_INTERVAL_SECONDS,
         () => {
           this._updateStatus();
           return GLib.SOURCE_CONTINUE;
@@ -103,11 +119,13 @@ const WarpToggle = GObject.registerClass(
 
     async _isWarpConnected() {
       try {
-        const status = await runCommand("status");
+        const status = await runCommand(COMMAND_STATUS);
         if (!status) {
           return false;
         }
-        return status.includes("Connected") || status.includes("Connecting");
+        return (
+          status.includes(STATUS_CONNECTED) || status.includes(STATUS_CONNECTING)
+        );
       } catch (err) {
         return false;
       }
@@ -129,7 +147,7 @@ const WarpIndicator = GObject.registerClass(
       super();
       // Create the indicator icon
       this._indicator = this._addIndicator();
-      this._indicator.iconName = "network-vpn-symbolic";
+      this._indicator.iconName = WARP_ICON;
       // Create the toggle button and bind its visibility to connection state
       const toggle = new WarpToggle();
       toggle.bind_property(
@@ -151,9 +169,9 @@ const WarpIndicator = GObject.registerClass(
 export default class WARPExtension extends Extension {
   enable() {
     // Check if warp-cli exists before executing.
-    if (!(GLib.find_program_in_path("warp-cli") ? true : false)) {
-      console.error("warp-cli command not found");
-      Main.notifyError("WARP Toggle", "warp-cli command not found");
+    if (!(GLib.find_program_in_path(WARP_CLI) ? true : false)) {
+      console.error(WARP_CLI_NOT_FOUND);
+      Main.notifyError(`${WARP_TITLE} Toggle`, WARP_CLI_NOT_FOUND);
       return;
     }
     // Add the indicator to the system panel

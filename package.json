@@ -7,7 +7,8 @@
     "build:install": "./build install",
     "build:uninstall": "./build uninstall",
     "build:zip": "./build zip",
-    "lint": "eslint extension.js metadata.json"
+    "lint": "eslint extension.js metadata.json",
+    "dev": "dbus-run-session -- gnome-shell --devkit"
   },
   "dependencies": {
     "@girs/gjs": "^4.0.0-beta.39",

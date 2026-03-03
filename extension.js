@@ -42,6 +42,7 @@ const STATE_DISABLED = "disabled";
 const STATE_NO_ROUTE = "no_route";
 const STATE_OFFLINE = "offline";
 const STATE_ERROR = "error";
+const STATE_NOT_REGISTERED = "not_registered";
 
 // icons and states
 const ICON_CONNECTED = "network-vpn-symbolic";
@@ -64,15 +65,17 @@ const COMMAND_DISCONNECT = "disconnect";
 const COMMAND_REGISTRATION_ORG = "registration organization";
 const COMMAND_REGISTRATION_SHOW = "registration show";
 
+// registration setup URL
+const URL_SETUP_GUIDE = "https://developers.cloudflare.com/warp-client/get-started/linux/";
+
 // subtitles
 const SUBTITLE_CONNECTING = "Connecting\u2026";
 const SUBTITLE_SERVICE_NOT_RUNNING = "Service not running";
 const SUBTITLE_NO_ROUTE = "No route to host";
 const SUBTITLE_OFFLINE = "Offline";
 const SUBTITLE_ERROR = "Unknown error";
-const SUBTITLE_NOT_REGISTERED = "Not registered";
 
-
+const SUBTITLE_NOT_REGISTERED = "Not registered \u00b7 Click to set up";
 const SUBTITLE_PREFIX_ORG = "Org: ";
 const SUBTITLE_PREFIX_PERSONAL = "Acc: ";
 
@@ -113,6 +116,8 @@ function getStateAppearance(state) {
       return { iconName: ICON_NO_ROUTE, checked: false, visible: true };
     case STATE_OFFLINE:
       return { iconName: ICON_OFFLINE, checked: false, visible: true };
+    case STATE_NOT_REGISTERED:
+      return { iconName: ICON_DISCONNECTED, checked: false, visible: true };
     case STATE_ERROR:
     default:
       return { iconName: ICON_ERROR, checked: false, visible: true };
@@ -129,6 +134,8 @@ function getStateSubtitle(state) {
       return SUBTITLE_NO_ROUTE;
     case STATE_OFFLINE:
       return SUBTITLE_OFFLINE;
+    case STATE_NOT_REGISTERED:
+      return SUBTITLE_NOT_REGISTERED;
     case STATE_ERROR:
       return SUBTITLE_ERROR;
     default:
@@ -287,6 +294,11 @@ const WarpToggle = GObject.registerClass(
 
       // Monitor button state changes
       this.connect("clicked", async () => {
+        if (this._notRegistered) {
+          Gio.AppInfo.launch_default_for_uri(URL_SETUP_GUIDE, null);
+          return;
+        }
+
         const command = this.checked ? COMMAND_CONNECT : COMMAND_DISCONNECT;
         this._setState(
           command === COMMAND_CONNECT ? STATE_CONNECTING : STATE_DISCONNECTED,
@@ -315,6 +327,7 @@ const WarpToggle = GObject.registerClass(
       this.visible = appearance.visible;
       // QuickToggle is a Clutter actor; `reactive` controls whether it accepts pointer input.
       this.reactive = state !== STATE_DISABLED;
+      this._notRegistered = state === STATE_NOT_REGISTERED;
       // Error-like states show their own subtitle; normal states restore the provider label.
       this.subtitle = getStateSubtitle(state) ?? this._providerSubtitle;
 
@@ -330,8 +343,13 @@ const WarpToggle = GObject.registerClass(
           this._getWarpState(),
           getVpnProvider(),
         ]);
-        this._providerSubtitle = provider;
-        this._setState(state);
+        if (provider === SUBTITLE_NOT_REGISTERED && state !== STATE_DISABLED) {
+          this._providerSubtitle = null;
+          this._setState(STATE_NOT_REGISTERED);
+        } else {
+          this._providerSubtitle = provider;
+          this._setState(state);
+        }
       } catch (err) {
         this._setState(classifyWarpFailure(err));
       }

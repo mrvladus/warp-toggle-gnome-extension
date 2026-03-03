@@ -36,19 +36,21 @@ enable()
   refreshes _providerSubtitle via getVpnProvider() on each cycle
         │
         ├─ status and error-like states  → subtitle = state message (overrides provider)
-        │     ├─ STATE_DISABLED      → "Service not running"
-        │     ├─ STATE_CONNECTING    → "Connecting…"
-        │     ├─ STATE_NO_ROUTE      → "No route to host"
-        │     ├─ STATE_OFFLINE       → "Offline"
-        │     └─ STATE_ERROR         → "Unknown error"
+        │     ├─ STATE_DISABLED        → "Service not running" (toggle non-reactive)
+        │     ├─ STATE_CONNECTING      → "Connecting…"
+        │     ├─ STATE_NO_ROUTE        → "No route to host"
+        │     ├─ STATE_OFFLINE         → "Offline"
+        │     ├─ STATE_ERROR           → "Unknown error"
+        │     └─ STATE_NOT_REGISTERED  → "Not registered · Click to set up"
+        │                                  click → opens setup URL in browser
         │
         └─ normal states  → subtitle = _providerSubtitle (from getVpnProvider())
               ├─ STATE_CONNECTED
               └─ STATE_DISCONNECTED
                     └─ getVpnProvider()
-                          ├─ Teams org found    → "Organization: <name>"
-                          ├─ personal email     → "Personal: <email>"
-                          ├─ personal acct name → "Personal: <name>"
-                          ├─ not registered     → "Not registered"
+                          ├─ Teams org found    → "Org: <name>"
+                          ├─ personal email     → "Acc: <email>"
+                          ├─ personal acct name → "Acc: <name>"
+                          ├─ not registered     → STATE_NOT_REGISTERED
                           └─ no info            → no subtitle
 ```

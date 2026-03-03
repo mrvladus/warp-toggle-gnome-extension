@@ -1,0 +1,276 @@
+#!/usr/bin/env bash
+# mock-warp-cli — drop-in replacement for warp-cli for manual extension testing.
+#
+# State is stored in plain files under /tmp:
+#   /tmp/mock-warp-cli-state          — one word: connected|disconnected|connecting|
+#                                        disabled|no_route|offline|error|not_registered
+#   /tmp/mock-warp-cli-registration   — one line: org:<name>  |  email:<addr>  |  (empty)
+#
+# Usage (control — you run these to set state):
+#   mock-warp-cli set-state <state>
+#   mock-warp-cli set-org   "<Org Name>"
+#   mock-warp-cli set-personal "<email@example.com>"
+#   mock-warp-cli clear-registration
+#   mock-warp-cli show
+#
+# Usage (extension-facing — the extension calls these automatically):
+#   mock-warp-cli status
+#   mock-warp-cli connect
+#   mock-warp-cli disconnect
+#   mock-warp-cli registration organization
+#   mock-warp-cli registration show
+
+STATE_FILE="/tmp/mock-warp-cli-state"
+REG_FILE="/tmp/mock-warp-cli-registration"
+
+_read_state() {
+  if [[ -f "$STATE_FILE" ]]; then
+    cat "$STATE_FILE"
+  else
+    echo "disconnected"
+  fi
+}
+
+_read_reg() {
+  if [[ -f "$REG_FILE" ]]; then
+    cat "$REG_FILE"
+  else
+    echo ""
+  fi
+}
+
+_write_state() {
+  echo "$1" > "$STATE_FILE"
+}
+
+# ---------------------------------------------------------------------------
+# Control commands
+# ---------------------------------------------------------------------------
+
+cmd_set_state() {
+  local state="$1"
+  case "$state" in
+    connected|disconnected|connecting|disabled|no_route|offline|error|not_registered)
+      _write_state "$state"
+      echo "State set to: $state"
+      ;;
+    *)
+      echo "Unknown state '$state'." >&2
+      echo "Valid states: connected disconnected connecting disabled no_route offline error not_registered" >&2
+      exit 1
+      ;;
+  esac
+}
+
+cmd_set_org() {
+  echo "org:$1" > "$REG_FILE"
+  echo "Registration set to org: $1"
+}
+
+cmd_set_personal() {
+  echo "email:$1" > "$REG_FILE"
+  echo "Registration set to personal: $1"
+}
+
+cmd_clear_registration() {
+  echo "" > "$REG_FILE"
+  echo "Registration cleared"
+}
+
+cmd_show() {
+  echo "State:        $(_read_state)"
+  local reg
+  reg="$(_read_reg)"
+  if [[ -z "$reg" ]]; then
+    echo "Registration: (none)"
+  else
+    echo "Registration: $reg"
+  fi
+}
+
+# ---------------------------------------------------------------------------
+# Extension-facing commands
+# ---------------------------------------------------------------------------
+
+cmd_status() {
+  local state
+  state="$(_read_state)"
+  case "$state" in
+    connected)
+      echo "Status update: connected"
+      ;;
+    connecting)
+      echo "Status update: connecting"
+      ;;
+    disconnected)
+      echo "Status update: disconnected"
+      ;;
+    disabled)
+      echo "Status update: service not running" >&2
+      exit 1
+      ;;
+    no_route)
+      echo "Status update: network is unreachable" >&2
+      exit 1
+      ;;
+    offline)
+      echo "Status update: timed out" >&2
+      exit 1
+      ;;
+    not_registered)
+      echo "Status update: not registered"
+      ;;
+    error|*)
+      echo "Status update: unknown error" >&2
+      exit 1
+      ;;
+  esac
+}
+
+cmd_connect() {
+  local state
+  state="$(_read_state)"
+  case "$state" in
+    disabled)
+      echo "Error: service not running" >&2
+      exit 1
+      ;;
+    no_route)
+      echo "Error: network is unreachable" >&2
+      exit 1
+      ;;
+    offline)
+      echo "Error: timed out" >&2
+      exit 1
+      ;;
+    error)
+      echo "Error: unknown error" >&2
+      exit 1
+      ;;
+    not_registered)
+      echo "Error: not registered" >&2
+      exit 1
+      ;;
+    *)
+      _write_state "connected"
+      echo "Success"
+      ;;
+  esac
+}
+
+cmd_disconnect() {
+  local state
+  state="$(_read_state)"
+  case "$state" in
+    disabled)
+      echo "Error: service not running" >&2
+      exit 1
+      ;;
+    no_route)
+      echo "Error: network is unreachable" >&2
+      exit 1
+      ;;
+    offline)
+      echo "Error: timed out" >&2
+      exit 1
+      ;;
+    error)
+      echo "Error: unknown error" >&2
+      exit 1
+      ;;
+    not_registered)
+      echo "Error: not registered" >&2
+      exit 1
+      ;;
+    *)
+      _write_state "disconnected"
+      echo "Success"
+      ;;
+  esac
+}
+
+cmd_registration_organization() {
+  local state
+  state="$(_read_state)"
+  if [[ "$state" == "not_registered" ]]; then
+    echo "Error: not registered" >&2
+    exit 1
+  fi
+
+  local reg
+  reg="$(_read_reg)"
+  if [[ "$reg" == org:* ]]; then
+    echo "${reg#org:}"
+  else
+    # Not a Teams account
+    echo "Error: registration missing" >&2
+    exit 1
+  fi
+}
+
+cmd_registration_show() {
+  local state
+  state="$(_read_state)"
+  if [[ "$state" == "not_registered" ]]; then
+    echo "Error: not registered" >&2
+    exit 1
+  fi
+
+  local reg
+  reg="$(_read_reg)"
+  if [[ "$reg" == org:* ]]; then
+    echo "Organization: ${reg#org:}"
+  elif [[ "$reg" == email:* ]]; then
+    echo "Email: ${reg#email:}"
+  else
+    echo "Account Name: Personal"
+  fi
+}
+
+# ---------------------------------------------------------------------------
+# Dispatch
+# ---------------------------------------------------------------------------
+
+case "$1" in
+  # Control commands
+  set-state)           cmd_set_state "$2" ;;
+  set-org)             cmd_set_org "$2" ;;
+  set-personal)        cmd_set_personal "$2" ;;
+  clear-registration)  cmd_clear_registration ;;
+  show)                cmd_show ;;
+
+  # Extension-facing commands
+  status)              cmd_status ;;
+  connect)             cmd_connect ;;
+  disconnect)          cmd_disconnect ;;
+  registration)
+    case "$2" in
+      organization)    cmd_registration_organization ;;
+      show)            cmd_registration_show ;;
+      *)
+        echo "Unknown registration subcommand: $2" >&2
+        exit 1
+        ;;
+    esac
+    ;;
+
+  *)
+    echo "mock-warp-cli — test stub for the WARP toggle GNOME extension"
+    echo ""
+    echo "Control commands (you run these):"
+    echo "  set-state <state>        Set state: connected|disconnected|connecting|"
+    echo "                           disabled|no_route|offline|error|not_registered"
+    echo "  set-org <name>           Set Teams org registration"
+    echo "  set-personal <email>     Set personal account registration"
+    echo "  clear-registration       Remove registration info"
+    echo "  show                     Print current state and registration"
+    echo ""
+    echo "Extension-facing commands (called automatically by the extension):"
+    echo "  status"
+    echo "  connect"
+    echo "  disconnect"
+    echo "  registration organization"
+    echo "  registration show"
+    exit 1
+    ;;
+esac

@@ -133,17 +133,21 @@ function getStateSubtitle(state) {
 }
 
 // Fetches the VPN provider / team name from `warp-cli account`.
-// Returns the team name, SUBTITLE_DEFAULT_PROVIDER as fallback, or
-// SUBTITLE_NOT_REGISTERED when no account is linked yet.
+// Resolution order: team name -> account name -> email -> default provider.
+// Returns SUBTITLE_NOT_REGISTERED when no account is linked yet.
 async function getVpnProvider() {
   try {
     const output = await runCommand(COMMAND_ACCOUNT);
-    const match = output.match(/team name:\s*(.+)/i);
-    if (match) {
-      return match[1].trim();
+    const teamMatch = output.match(/team name:\s*(.+)/i);
+    if (teamMatch) {
+      return teamMatch[1].trim();
     }
     if (/not (registered|logged in)/i.test(output)) {
       return SUBTITLE_NOT_REGISTERED;
+    }
+    const accountMatch = output.match(/account name:\s*(.+)/i) ?? output.match(/email:\s*(.+)/i);
+    if (accountMatch) {
+      return accountMatch[1].trim();
     }
     return SUBTITLE_DEFAULT_PROVIDER;
   } catch (err) {

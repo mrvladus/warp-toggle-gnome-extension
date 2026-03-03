@@ -71,7 +71,10 @@ const SUBTITLE_NO_ROUTE = "No route to host";
 const SUBTITLE_OFFLINE = "Offline";
 const SUBTITLE_ERROR = "Unknown error";
 const SUBTITLE_NOT_REGISTERED = "Not registered";
-const SUBTITLE_DEFAULT_PROVIDER = "Cloudflare WARP";
+
+
+const SUBTITLE_PREFIX_ORG = "Org: ";
+const SUBTITLE_PREFIX_PERSONAL = "Acc: ";
 
 // error strings
 const WARP_CLI_NOT_FOUND = "warp-cli command not found";
@@ -133,10 +136,11 @@ function getStateSubtitle(state) {
   }
 }
 
-// Fetches the VPN provider / org name via `warp-cli registration organization`.
-// Falls back to `registration show` to find personal account details.
-// Returns SUBTITLE_NOT_REGISTERED when no account is linked yet, or null
-// when the account is personal with no identifiable info.
+// Fetches the VPN provider label via `warp-cli registration organization`
+// (Teams) or `registration show` (personal).
+// Returns a prefixed string: "Organization: <name>" or "Personal: <name>",
+// SUBTITLE_NOT_REGISTERED when no account is linked yet, or null when no
+// identifiable info is available.
 async function getVpnProvider() {
   const isNotRegistered = (msg) =>
     msg.includes("not registered") || msg.includes("registration missing");
@@ -144,7 +148,7 @@ async function getVpnProvider() {
   try {
     const org = await runCommand(COMMAND_REGISTRATION_ORG);
     if (org) {
-      return org;
+      return SUBTITLE_PREFIX_ORG + org;
     }
   } catch (err) {
     if (isNotRegistered(`${err}`.toLowerCase())) {
@@ -157,16 +161,16 @@ async function getVpnProvider() {
     const info = await runCommand(COMMAND_REGISTRATION_SHOW);
     const orgMatch = info.match(/^organization:\s*(.+)/im);
     if (orgMatch) {
-      return orgMatch[1].trim();
+      return SUBTITLE_PREFIX_ORG + orgMatch[1].trim();
     }
     // Try personal account identifiers
     const emailMatch = info.match(/^email:\s*(.+)/im);
     if (emailMatch) {
-      return emailMatch[1].trim();
+      return SUBTITLE_PREFIX_PERSONAL + emailMatch[1].trim();
     }
     const accountMatch = info.match(/^account name:\s*(.+)/im);
     if (accountMatch) {
-      return accountMatch[1].trim();
+      return SUBTITLE_PREFIX_PERSONAL + accountMatch[1].trim();
     }
     // Personal account but no identifiable info
     return null;
@@ -262,11 +266,20 @@ const WarpToggle = GObject.registerClass(
       this._state = null;
       this._cliAvailable = cliAvailable;
       this._statusCheckId = null; // Store timeout ID
+      this._providerSubtitle = null; // Cached provider label
 
       if (!this._cliAvailable) {
         this._setState(STATE_DISABLED);
         return;
       }
+
+      // Fetch provider label immediately so it shows before the first status poll
+      getVpnProvider().then((p) => {
+        this._providerSubtitle = p;
+        if (!getStateSubtitle(this._state)) {
+          this.subtitle = p;
+        }
+      }).catch(() => {});
 
       this._setState(STATE_DISCONNECTED);
       this._updateStatus(); // Initial check
@@ -302,8 +315,8 @@ const WarpToggle = GObject.registerClass(
       this.visible = appearance.visible;
       // QuickToggle is a Clutter actor; `reactive` controls whether it accepts pointer input.
       this.reactive = state !== STATE_DISABLED;
-      // Set a static subtitle immediately; connected state gets an async update below.
-      this.subtitle = getStateSubtitle(state);
+      // Error-like states show their own subtitle; normal states restore the provider label.
+      this.subtitle = getStateSubtitle(state) ?? this._providerSubtitle;
 
       if (this._onStateChange) {
         this._onStateChange(appearance);
@@ -312,16 +325,13 @@ const WarpToggle = GObject.registerClass(
 
     async _updateStatus() {
       try {
-        const state = await this._getWarpState();
+        // TODO: not ideal running Promise.all and the vpn provider here all the time
+        const [state, provider] = await Promise.all([
+          this._getWarpState(),
+          getVpnProvider(),
+        ]);
+        this._providerSubtitle = provider;
         this._setState(state);
-        const provider = await getVpnProvider();
-        if (state === STATE_CONNECTED) {
-          // Show org/personal details, or nothing if no info found
-          this.subtitle = provider ?? null;
-        } else if (provider === SUBTITLE_NOT_REGISTERED && state !== STATE_DISABLED) {
-          // Show "Not registered" regardless of connection state (service is up but no account)
-          this.subtitle = SUBTITLE_NOT_REGISTERED;
-        }
       } catch (err) {
         this._setState(classifyWarpFailure(err));
       }

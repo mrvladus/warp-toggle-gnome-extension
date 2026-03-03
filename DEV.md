@@ -29,19 +29,26 @@ enable()
   └─ cliAvailable? ──> no ──► show error notification, subtitle hidden, don't add quick button
         │ yes
         ▼
-  periodic _updateStatus()  (every 10 s + on toggle click)
+  getVpnProvider() called immediately → cached as _providerSubtitle
         │
-        ├─ STATE_DISABLED      → subtitle = "Service not running"
-        ├─ STATE_CONNECTING    → subtitle = "Connecting…"
-        ├─ STATE_NO_ROUTE      → subtitle = "No route to host"
-        ├─ STATE_OFFLINE       → subtitle = "Offline"
-        ├─ STATE_ERROR         → subtitle = "Unknown error"
-        ├─ STATE_DISCONNECTED  → no subtitle
-        └─ STATE_CONNECTED
-              └─ getVpnProvider() 
-                    ├─ `registration organization` succeeds → subtitle = "<Org name>"
-                    ├─ not registered (any state except disabled) → subtitle = "Not registered"
-                    ├─ personal: email found               → subtitle = "<Email>"
-                    ├─ personal: account name found        → subtitle = "<Account name>"
-                    └─ personal: no identifiable info      → no subtitle
+        ▼
+  periodic _updateStatus()  (every 10 s + on toggle click)
+  refreshes _providerSubtitle via getVpnProvider() on each cycle
+        │
+        ├─ status and error-like states  → subtitle = state message (overrides provider)
+        │     ├─ STATE_DISABLED      → "Service not running"
+        │     ├─ STATE_CONNECTING    → "Connecting…"
+        │     ├─ STATE_NO_ROUTE      → "No route to host"
+        │     ├─ STATE_OFFLINE       → "Offline"
+        │     └─ STATE_ERROR         → "Unknown error"
+        │
+        └─ normal states  → subtitle = _providerSubtitle (from getVpnProvider())
+              ├─ STATE_CONNECTED
+              └─ STATE_DISCONNECTED
+                    └─ getVpnProvider()
+                          ├─ Teams org found    → "Organization: <name>"
+                          ├─ personal email     → "Personal: <email>"
+                          ├─ personal acct name → "Personal: <name>"
+                          ├─ not registered     → "Not registered"
+                          └─ no info            → no subtitle
 ```

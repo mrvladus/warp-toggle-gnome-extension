@@ -58,7 +58,7 @@ const STATUS_CONNECTING = "connecting";
 const STATUS_DISCONNECTED = "disconnected";
 
 // command parameters
-const WARP_CLI = "warp-cli";
+const WARP_CLI = GLib.getenv("WARP_CLI") || "warp-cli";
 const COMMAND_STATUS = "status";
 const COMMAND_CONNECT = "connect";
 const COMMAND_DISCONNECT = "disconnect";

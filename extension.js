@@ -61,6 +61,16 @@ const WARP_CLI = "warp-cli";
 const COMMAND_STATUS = "status";
 const COMMAND_CONNECT = "connect";
 const COMMAND_DISCONNECT = "disconnect";
+const COMMAND_ACCOUNT = "account";
+
+// subtitles
+const SUBTITLE_CONNECTING = "Connecting\u2026";
+const SUBTITLE_SERVICE_NOT_RUNNING = "Service not running";
+const SUBTITLE_NO_ROUTE = "No route to host";
+const SUBTITLE_OFFLINE = "Offline";
+const SUBTITLE_ERROR = "Unknown error";
+const SUBTITLE_NOT_REGISTERED = "Not registered";
+const SUBTITLE_DEFAULT_PROVIDER = "Cloudflare WARP";
 
 // error strings
 const WARP_CLI_NOT_FOUND = "warp-cli command not found";
@@ -102,6 +112,46 @@ function getStateAppearance(state) {
     case STATE_ERROR:
     default:
       return { iconName: ICON_ERROR, checked: false, visible: true };
+  }
+}
+
+function getStateSubtitle(state) {
+  switch (state) {
+    case STATE_CONNECTING:
+      return SUBTITLE_CONNECTING;
+    case STATE_DISABLED:
+      return SUBTITLE_SERVICE_NOT_RUNNING;
+    case STATE_NO_ROUTE:
+      return SUBTITLE_NO_ROUTE;
+    case STATE_OFFLINE:
+      return SUBTITLE_OFFLINE;
+    case STATE_ERROR:
+      return SUBTITLE_ERROR;
+    default:
+      return "";
+  }
+}
+
+// Fetches the VPN provider / team name from `warp-cli account`.
+// Returns the team name, SUBTITLE_DEFAULT_PROVIDER as fallback, or
+// SUBTITLE_NOT_REGISTERED when no account is linked yet.
+async function getVpnProvider() {
+  try {
+    const output = await runCommand(COMMAND_ACCOUNT);
+    const match = output.match(/team name:\s*(.+)/i);
+    if (match) {
+      return match[1].trim();
+    }
+    if (/not (registered|logged in)/i.test(output)) {
+      return SUBTITLE_NOT_REGISTERED;
+    }
+    return SUBTITLE_DEFAULT_PROVIDER;
+  } catch (err) {
+    const message = `${err}`.toLowerCase();
+    if (message.includes("not registered") || message.includes("registration missing")) {
+      return SUBTITLE_NOT_REGISTERED;
+    }
+    return null;
   }
 }
 
@@ -229,6 +279,8 @@ const WarpToggle = GObject.registerClass(
       this.visible = appearance.visible;
       // QuickToggle is a Clutter actor; `reactive` controls whether it accepts pointer input.
       this.reactive = state !== STATE_DISABLED;
+      // Set a static subtitle immediately; connected state gets an async update below.
+      this.subtitle = getStateSubtitle(state);
 
       if (this._onStateChange) {
         this._onStateChange(appearance);
@@ -239,6 +291,10 @@ const WarpToggle = GObject.registerClass(
       try {
         const state = await this._getWarpState();
         this._setState(state);
+        if (state === STATE_CONNECTED) {
+          const provider = await getVpnProvider();
+          this.subtitle = provider ?? "";
+        }
       } catch (err) {
         this._setState(classifyWarpFailure(err));
       }

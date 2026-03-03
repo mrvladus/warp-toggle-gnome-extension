@@ -68,6 +68,11 @@ const COMMAND_REGISTRATION_SHOW = "registration show";
 // registration setup URL
 const URL_SETUP_GUIDE = "https://developers.cloudflare.com/warp-client/get-started/linux/";
 
+const ANIMATION_FRAMES = Array.from({ length: 14 }, (_, i) =>
+  `nm-vpn-connecting${String(i + 1).padStart(2, "0")}-symbolic`
+);
+const ANIMATION_FRAME_INTERVAL_MS = 100;
+
 // subtitles
 const SUBTITLE_CONNECTING = "Connecting\u2026";
 const SUBTITLE_SERVICE_NOT_RUNNING = "Service not running";
@@ -274,6 +279,8 @@ const WarpToggle = GObject.registerClass(
       this._cliAvailable = cliAvailable;
       this._statusCheckId = null; // Store timeout ID
       this._providerSubtitle = null; // Cached provider label
+      this._animationTimerId = null;
+      this._animationFrameIndex = 0;
 
       if (!this._cliAvailable) {
         this._setState(STATE_DISABLED);
@@ -315,14 +322,46 @@ const WarpToggle = GObject.registerClass(
       });
     }
 
+    _startConnectingAnimation() {
+      if (this._animationTimerId !== null) return;
+      this._animationFrameIndex = 0;
+      const tick = () => {
+        const iconName = ANIMATION_FRAMES[this._animationFrameIndex];
+        this.iconName = iconName;
+        if (this._onStateChange) {
+          this._onStateChange({ iconName, visible: true });
+        }
+        this._animationFrameIndex =
+          (this._animationFrameIndex + 1) % ANIMATION_FRAMES.length;
+        return GLib.SOURCE_CONTINUE;
+      };
+      tick();
+      this._animationTimerId = GLib.timeout_add(
+        GLib.PRIORITY_DEFAULT,
+        ANIMATION_FRAME_INTERVAL_MS,
+        tick
+      );
+    }
+
+    _stopConnectingAnimation() {
+      if (this._animationTimerId !== null) {
+        GLib.source_remove(this._animationTimerId);
+        this._animationTimerId = null;
+      }
+      this._animationFrameIndex = 0;
+    }
+
     _setState(state) {
       if (this._state === state) {
         return;
       }
 
+      this._stopConnectingAnimation();
       this._state = state;
       const appearance = getStateAppearance(state);
-      this.iconName = appearance.iconName;
+      if (state !== STATE_CONNECTING) {
+        this.iconName = appearance.iconName;
+      }
       this.checked = appearance.checked;
       this.visible = appearance.visible;
       // QuickToggle is a Clutter actor; `reactive` controls whether it accepts pointer input.
@@ -331,7 +370,9 @@ const WarpToggle = GObject.registerClass(
       // Error-like states show their own subtitle; normal states restore the provider label.
       this.subtitle = getStateSubtitle(state) ?? this._providerSubtitle;
 
-      if (this._onStateChange) {
+      if (state === STATE_CONNECTING) {
+        this._startConnectingAnimation();
+      } else if (this._onStateChange) {
         this._onStateChange(appearance);
       }
     }
@@ -373,6 +414,7 @@ const WarpToggle = GObject.registerClass(
     }
 
     destroy() {
+      this._stopConnectingAnimation();
       if (this._statusCheckId) {
         GLib.source_remove(this._statusCheckId);
         this._statusCheckId = null;

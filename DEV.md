@@ -26,7 +26,7 @@ Describes how the extension determines what to display in the Quick Settings tog
 
 ```
 enable()
-  └─ cliAvailable? ──> no ──► show error notification, subtitle hidden, don't add quick button
+  └─ cliAvailable? ──► no ──► show error notification, subtitle hidden, don't add quick button
         │ yes
         ▼
   getVpnProvider() called immediately → cached as _providerSubtitle
@@ -44,7 +44,7 @@ enable()
         │     └─ STATE_NOT_REGISTERED  → "Not registered · Click to set up"
         │                                  click → opens setup URL in browser
         │
-        └─ normal states  → subtitle = _providerSubtitle (from getVpnProvider())
+        └─ normal states  → subtitle = _providerSubtitle
               ├─ STATE_CONNECTED
               └─ STATE_DISCONNECTED
                     └─ getVpnProvider()

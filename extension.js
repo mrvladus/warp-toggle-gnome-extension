@@ -117,7 +117,7 @@ function getStateAppearance(state) {
     case STATE_OFFLINE:
       return { iconName: ICON_OFFLINE, checked: false, visible: true };
     case STATE_NOT_REGISTERED:
-      return { iconName: ICON_DISCONNECTED, checked: false, visible: true };
+      return { iconName: ICON_NO_ROUTE, checked: false, visible: true };
     case STATE_ERROR:
     default:
       return { iconName: ICON_ERROR, checked: false, visible: true };

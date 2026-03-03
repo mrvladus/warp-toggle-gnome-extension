@@ -128,7 +128,7 @@ function getStateSubtitle(state) {
     case STATE_ERROR:
       return SUBTITLE_ERROR;
     default:
-      return "";
+      return null;
   }
 }
 
@@ -297,7 +297,7 @@ const WarpToggle = GObject.registerClass(
         this._setState(state);
         if (state === STATE_CONNECTED) {
           const provider = await getVpnProvider();
-          this.subtitle = provider ?? "";
+          this.subtitle = provider ?? null;
         }
       } catch (err) {
         this._setState(classifyWarpFailure(err));

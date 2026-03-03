@@ -18,6 +18,57 @@ npm run dev
 
 A window opens running a full GNOME Shell session with your installed extension active. Close it when done — nothing affects your real session.
 
+The `dev` script automatically sets `WARP_CLI` to the bundled `mock-warp-cli` stub so you can test all extension states without a real Cloudflare WARP installation.
+
+---
+
+## Mock CLI (`mock-warp-cli`)
+
+A single bash script that acts as a drop-in replacement for `warp-cli`. State is persisted in two plain files under `/tmp`:
+
+| File | Contents |
+|---|---|
+| `/tmp/mock-warp-cli-state` | One word: `connected` \| `disconnected` \| `connecting` \| `disabled` \| `no_route` \| `offline` \| `error` \| `not_registered` |
+| `/tmp/mock-warp-cli-registration` | `org:<name>` \| `email:<addr>` \| *(empty)* |
+
+### Switching state
+
+From any terminal while the nested session is running:
+
+```bash
+./mock-warp-cli set-state connected
+./mock-warp-cli set-state disconnected
+./mock-warp-cli set-state connecting
+./mock-warp-cli set-state disabled
+./mock-warp-cli set-state no_route
+./mock-warp-cli set-state offline
+./mock-warp-cli set-state error
+./mock-warp-cli set-state not_registered
+```
+
+The extension polls every 10 s, so the next poll picks up the new state automatically.
+
+### Registration / account type
+
+```bash
+./mock-warp-cli set-org "Acme Corp"          # Teams account   → subtitle "Org: Acme Corp"
+./mock-warp-cli set-personal "user@corp.com" # Personal account → subtitle "Acc: user@corp.com"
+./mock-warp-cli clear-registration           # No account linked
+```
+
+### Inspect current mock state
+
+```bash
+./mock-warp-cli show
+```
+
+### Wiring it up manually (without `npm run dev`)
+
+```bash
+export WARP_CLI=$(pwd)/mock-warp-cli
+dbus-run-session -- gnome-shell --devkit
+```
+
 ---
 
 ## State Flow

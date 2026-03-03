@@ -61,7 +61,8 @@ const WARP_CLI = "warp-cli";
 const COMMAND_STATUS = "status";
 const COMMAND_CONNECT = "connect";
 const COMMAND_DISCONNECT = "disconnect";
-const COMMAND_ACCOUNT = "account";
+const COMMAND_REGISTRATION_ORG = "registration organization";
+const COMMAND_REGISTRATION_SHOW = "registration show";
 
 // subtitles
 const SUBTITLE_CONNECTING = "Connecting\u2026";
@@ -132,27 +133,45 @@ function getStateSubtitle(state) {
   }
 }
 
-// Fetches the VPN provider / team name from `warp-cli account`.
-// Resolution order: team name -> account name -> email -> default provider.
-// Returns SUBTITLE_NOT_REGISTERED when no account is linked yet.
+// Fetches the VPN provider / org name via `warp-cli registration organization`.
+// Falls back to `registration show` to find personal account details.
+// Returns SUBTITLE_NOT_REGISTERED when no account is linked yet, or null
+// when the account is personal with no identifiable info.
 async function getVpnProvider() {
+  const isNotRegistered = (msg) =>
+    msg.includes("not registered") || msg.includes("registration missing");
+
   try {
-    const output = await runCommand(COMMAND_ACCOUNT);
-    const teamMatch = output.match(/team name:\s*(.+)/i);
-    if (teamMatch) {
-      return teamMatch[1].trim();
+    const org = await runCommand(COMMAND_REGISTRATION_ORG);
+    if (org) {
+      return org;
     }
-    if (/not (registered|logged in)/i.test(output)) {
+  } catch (err) {
+    if (isNotRegistered(`${err}`.toLowerCase())) {
       return SUBTITLE_NOT_REGISTERED;
     }
-    const accountMatch = output.match(/account name:\s*(.+)/i) ?? output.match(/email:\s*(.+)/i);
+    // Not a Teams account — fall through to registration show
+  }
+
+  try {
+    const info = await runCommand(COMMAND_REGISTRATION_SHOW);
+    const orgMatch = info.match(/^organization:\s*(.+)/im);
+    if (orgMatch) {
+      return orgMatch[1].trim();
+    }
+    // Try personal account identifiers
+    const emailMatch = info.match(/^email:\s*(.+)/im);
+    if (emailMatch) {
+      return emailMatch[1].trim();
+    }
+    const accountMatch = info.match(/^account name:\s*(.+)/im);
     if (accountMatch) {
       return accountMatch[1].trim();
     }
-    return SUBTITLE_DEFAULT_PROVIDER;
+    // Personal account but no identifiable info
+    return null;
   } catch (err) {
-    const message = `${err}`.toLowerCase();
-    if (message.includes("not registered") || message.includes("registration missing")) {
+    if (isNotRegistered(`${err}`.toLowerCase())) {
       return SUBTITLE_NOT_REGISTERED;
     }
     return null;
@@ -206,7 +225,7 @@ async function runCommand(cmd) {
   return new Promise((resolve, reject) => {
     try {
       const proc = new Gio.Subprocess({
-        argv: [WARP_CLI, cmd],
+        argv: [WARP_CLI, ...cmd.split(" ")],
         flags:
           Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE,
       });
@@ -295,9 +314,13 @@ const WarpToggle = GObject.registerClass(
       try {
         const state = await this._getWarpState();
         this._setState(state);
+        const provider = await getVpnProvider();
         if (state === STATE_CONNECTED) {
-          const provider = await getVpnProvider();
+          // Show org/personal details, or nothing if no info found
           this.subtitle = provider ?? null;
+        } else if (provider === SUBTITLE_NOT_REGISTERED && state !== STATE_DISABLED) {
+          // Show "Not registered" regardless of connection state (service is up but no account)
+          this.subtitle = SUBTITLE_NOT_REGISTERED;
         }
       } catch (err) {
         this._setState(classifyWarpFailure(err));

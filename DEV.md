@@ -38,10 +38,10 @@ enable()
         ├─ STATE_ERROR         → subtitle = "Unknown error"
         ├─ STATE_DISCONNECTED  → no subtitle
         └─ STATE_CONNECTED
-              └─ getVpnProvider()  (runs `warp-cli account`)
-                    ├─ team name found    → subtitle = "<Team name>"
-                    ├─ account name found → subtitle = "<Account name>"
-                    ├─ email found        → subtitle = "<Email>"
-                    ├─ not registered     → subtitle = "Not registered"
-                    └─ default           → subtitle = "Cloudflare WARP"
+              └─ getVpnProvider() 
+                    ├─ `registration organization` succeeds → subtitle = "<Org name>"
+                    ├─ not registered (any state except disabled) → subtitle = "Not registered"
+                    ├─ personal: email found               → subtitle = "<Email>"
+                    ├─ personal: account name found        → subtitle = "<Account name>"
+                    └─ personal: no identifiable info      → no subtitle
 ```

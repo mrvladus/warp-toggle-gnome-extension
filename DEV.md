@@ -65,6 +65,7 @@ The extension polls every 10 s, so the next poll picks up the new state automati
 ### Wiring it up manually (without `npm run dev`)
 
 ```bash
+./build install
 export WARP_CLI=$(pwd)/mock-warp-cli
 dbus-run-session -- gnome-shell --devkit
 ```

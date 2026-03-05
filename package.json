@@ -8,7 +8,7 @@
     "build:uninstall": "./build uninstall",
     "build:zip": "./build zip",
     "lint": "eslint extension.js metadata.json",
-    "dev": "WARP_CLI=$(pwd)/mock-warp-cli dbus-run-session -- gnome-shell --devkit"
+    "dev": "./build install && WARP_CLI=$(pwd)/mock-warp-cli dbus-run-session -- gnome-shell --devkit"
   },
   "dependencies": {
     "@girs/gjs": "^4.0.0-beta.39",

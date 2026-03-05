@@ -450,10 +450,12 @@ const WarpIndicator = GObject.registerClass(
 
 export default class WARPExtension extends Extension {
   enable() {
-    const cliAvailable = Boolean(GLib.find_program_in_path(WARP_CLI));
+    const cliAvailable = WARP_CLI.includes("/")
+      ? GLib.file_test(WARP_CLI, GLib.FileTest.IS_EXECUTABLE)
+      : Boolean(GLib.find_program_in_path(WARP_CLI));
     if (!cliAvailable) {
       console.error(WARP_CLI_NOT_FOUND);
-      Main.notifyError(`${WARP_TITLE} Toggle`, WARP_CLI_NOT_FOUND);
+      Main.notifyError(`${WARP_TITLE} Toggle`, `${WARP_CLI_NOT_FOUND}: ${WARP_CLI}`);
     }
 
     // Add the indicator to the system panel

@@ -42,6 +42,7 @@ const STATE_DISABLED = "disabled";
 const STATE_NO_ROUTE = "no_route";
 const STATE_OFFLINE = "offline";
 const STATE_ERROR = "error";
+const STATE_NOT_REGISTERED = "not_registered";
 
 // icons and states
 const ICON_CONNECTED = "network-vpn-symbolic";
@@ -61,6 +62,27 @@ const WARP_CLI = "warp-cli";
 const COMMAND_STATUS = "status";
 const COMMAND_CONNECT = "connect";
 const COMMAND_DISCONNECT = "disconnect";
+const COMMAND_REGISTRATION_ORG = "registration organization";
+const COMMAND_REGISTRATION_SHOW = "registration show";
+
+// registration setup URL
+const URL_SETUP_GUIDE = "https://developers.cloudflare.com/warp-client/get-started/linux/";
+
+const ANIMATION_FRAMES = Array.from({ length: 14 }, (_, i) =>
+  `nm-vpn-connecting${String(i + 1).padStart(2, "0")}-symbolic`
+);
+const ANIMATION_FRAME_INTERVAL_MS = 100;
+
+// subtitles
+const SUBTITLE_CONNECTING = "Connecting\u2026";
+const SUBTITLE_SERVICE_NOT_RUNNING = "Service not running";
+const SUBTITLE_NO_ROUTE = "No route to host";
+const SUBTITLE_OFFLINE = "Offline";
+const SUBTITLE_ERROR = "Unknown error";
+
+const SUBTITLE_NOT_REGISTERED = "Not registered \u00b7 Click to set up";
+const SUBTITLE_PREFIX_ORG = "Org: ";
+const SUBTITLE_PREFIX_PERSONAL = "Acc: ";
 
 // error strings
 const WARP_CLI_NOT_FOUND = "warp-cli command not found";
@@ -99,9 +121,76 @@ function getStateAppearance(state) {
       return { iconName: ICON_NO_ROUTE, checked: false, visible: true };
     case STATE_OFFLINE:
       return { iconName: ICON_OFFLINE, checked: false, visible: true };
+    case STATE_NOT_REGISTERED:
+      return { iconName: ICON_NO_ROUTE, checked: false, visible: true };
     case STATE_ERROR:
     default:
       return { iconName: ICON_ERROR, checked: false, visible: true };
+  }
+}
+
+function getStateSubtitle(state) {
+  switch (state) {
+    case STATE_CONNECTING:
+      return SUBTITLE_CONNECTING;
+    case STATE_DISABLED:
+      return SUBTITLE_SERVICE_NOT_RUNNING;
+    case STATE_NO_ROUTE:
+      return SUBTITLE_NO_ROUTE;
+    case STATE_OFFLINE:
+      return SUBTITLE_OFFLINE;
+    case STATE_NOT_REGISTERED:
+      return SUBTITLE_NOT_REGISTERED;
+    case STATE_ERROR:
+      return SUBTITLE_ERROR;
+    default:
+      return null;
+  }
+}
+
+// Fetches the VPN provider label via `warp-cli registration organization`
+// (Teams) or `registration show` (personal).
+// Returns a prefixed string: "Organization: <name>" or "Personal: <name>",
+// SUBTITLE_NOT_REGISTERED when no account is linked yet, or null when no
+// identifiable info is available.
+async function getVpnProvider() {
+  const isNotRegistered = (msg) =>
+    msg.includes("not registered") || msg.includes("registration missing");
+
+  try {
+    const org = await runCommand(COMMAND_REGISTRATION_ORG);
+    if (org) {
+      return SUBTITLE_PREFIX_ORG + org;
+    }
+  } catch (err) {
+    if (isNotRegistered(`${err}`.toLowerCase())) {
+      return SUBTITLE_NOT_REGISTERED;
+    }
+    // Not a Teams account — fall through to registration show
+  }
+
+  try {
+    const info = await runCommand(COMMAND_REGISTRATION_SHOW);
+    const orgMatch = info.match(/^organization:\s*(.+)/im);
+    if (orgMatch) {
+      return SUBTITLE_PREFIX_ORG + orgMatch[1].trim();
+    }
+    // Try personal account identifiers
+    const emailMatch = info.match(/^email:\s*(.+)/im);
+    if (emailMatch) {
+      return SUBTITLE_PREFIX_PERSONAL + emailMatch[1].trim();
+    }
+    const accountMatch = info.match(/^account name:\s*(.+)/im);
+    if (accountMatch) {
+      return SUBTITLE_PREFIX_PERSONAL + accountMatch[1].trim();
+    }
+    // Personal account but no identifiable info
+    return null;
+  } catch (err) {
+    if (isNotRegistered(`${err}`.toLowerCase())) {
+      return SUBTITLE_NOT_REGISTERED;
+    }
+    return null;
   }
 }
 
@@ -152,7 +241,7 @@ async function runCommand(cmd) {
   return new Promise((resolve, reject) => {
     try {
       const proc = new Gio.Subprocess({
-        argv: [WARP_CLI, cmd],
+        argv: [WARP_CLI, ...cmd.split(" ")],
         flags:
           Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE,
       });
@@ -189,11 +278,22 @@ const WarpToggle = GObject.registerClass(
       this._state = null;
       this._cliAvailable = cliAvailable;
       this._statusCheckId = null; // Store timeout ID
+      this._providerSubtitle = null; // Cached provider label
+      this._animationTimerId = null;
+      this._animationFrameIndex = 0;
 
       if (!this._cliAvailable) {
         this._setState(STATE_DISABLED);
         return;
       }
+
+      // Fetch provider label immediately so it shows before the first status poll
+      getVpnProvider().then((p) => {
+        this._providerSubtitle = p;
+        if (!getStateSubtitle(this._state)) {
+          this.subtitle = p;
+        }
+      }).catch(() => {});
 
       this._setState(STATE_DISCONNECTED);
       this._updateStatus(); // Initial check
@@ -201,6 +301,11 @@ const WarpToggle = GObject.registerClass(
 
       // Monitor button state changes
       this.connect("clicked", async () => {
+        if (this._notRegistered) {
+          Gio.AppInfo.launch_default_for_uri(URL_SETUP_GUIDE, null);
+          return;
+        }
+
         const command = this.checked ? COMMAND_CONNECT : COMMAND_DISCONNECT;
         this._setState(
           command === COMMAND_CONNECT ? STATE_CONNECTING : STATE_DISCONNECTED,
@@ -217,28 +322,75 @@ const WarpToggle = GObject.registerClass(
       });
     }
 
+    _startConnectingAnimation() {
+      if (this._animationTimerId !== null) return;
+      this._animationFrameIndex = 0;
+      const tick = () => {
+        const iconName = ANIMATION_FRAMES[this._animationFrameIndex];
+        this.iconName = iconName;
+        if (this._onStateChange) {
+          this._onStateChange({ iconName, visible: true });
+        }
+        this._animationFrameIndex =
+          (this._animationFrameIndex + 1) % ANIMATION_FRAMES.length;
+        return GLib.SOURCE_CONTINUE;
+      };
+      tick();
+      this._animationTimerId = GLib.timeout_add(
+        GLib.PRIORITY_DEFAULT,
+        ANIMATION_FRAME_INTERVAL_MS,
+        tick
+      );
+    }
+
+    _stopConnectingAnimation() {
+      if (this._animationTimerId !== null) {
+        GLib.source_remove(this._animationTimerId);
+        this._animationTimerId = null;
+      }
+      this._animationFrameIndex = 0;
+    }
+
     _setState(state) {
       if (this._state === state) {
         return;
       }
 
+      this._stopConnectingAnimation();
       this._state = state;
       const appearance = getStateAppearance(state);
-      this.iconName = appearance.iconName;
+      if (state !== STATE_CONNECTING) {
+        this.iconName = appearance.iconName;
+      }
       this.checked = appearance.checked;
       this.visible = appearance.visible;
       // QuickToggle is a Clutter actor; `reactive` controls whether it accepts pointer input.
       this.reactive = state !== STATE_DISABLED;
+      this._notRegistered = state === STATE_NOT_REGISTERED;
+      // Error-like states show their own subtitle; normal states restore the provider label.
+      this.subtitle = getStateSubtitle(state) ?? this._providerSubtitle;
 
-      if (this._onStateChange) {
+      if (state === STATE_CONNECTING) {
+        this._startConnectingAnimation();
+      } else if (this._onStateChange) {
         this._onStateChange(appearance);
       }
     }
 
     async _updateStatus() {
       try {
-        const state = await this._getWarpState();
-        this._setState(state);
+        // TODO: not ideal running Promise.all and the vpn provider here all the time
+        const [state, provider] = await Promise.all([
+          this._getWarpState(),
+          getVpnProvider(),
+        ]);
+        if (provider === SUBTITLE_NOT_REGISTERED && state !== STATE_DISABLED) {
+          this._providerSubtitle = null;
+          this._setState(STATE_NOT_REGISTERED);
+        } else {
+          this._providerSubtitle = provider;
+          this._setState(state);
+        }
       } catch (err) {
         this._setState(classifyWarpFailure(err));
       }
@@ -262,6 +414,7 @@ const WarpToggle = GObject.registerClass(
     }
 
     destroy() {
+      this._stopConnectingAnimation();
       if (this._statusCheckId) {
         GLib.source_remove(this._statusCheckId);
         this._statusCheckId = null;

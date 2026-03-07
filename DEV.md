@@ -33,7 +33,20 @@ A single bash script that acts as a drop-in replacement for `warp-cli`. State is
 
 ### Switching state
 
-From any terminal while the nested session is running:
+Use npm scripts from a second terminal while the nested session is running:
+
+```bash
+npm run mock:connected
+npm run mock:disconnected
+npm run mock:connecting
+npm run mock:disabled
+npm run mock:no_route
+npm run mock:offline
+npm run mock:error
+npm run mock:not_registered
+```
+
+or you can run the mock cli script directly:
 
 ```bash
 ./mock-warp-cli set-state connected
@@ -51,15 +64,15 @@ The extension polls every 10 s, so the next poll picks up the new state automati
 ### Registration / account type
 
 ```bash
-./mock-warp-cli set-org "Acme Corp"          # Teams account   → subtitle "Org: Acme Corp"
-./mock-warp-cli set-personal "user@corp.com" # Personal account → subtitle "Acc: user@corp.com"
-./mock-warp-cli clear-registration           # No account linked
+npm run mock:org -- "Acme Corp"          # Teams account   → subtitle "Org: Acme Corp"
+npm run mock:personal -- "user@corp.com" # Personal account → subtitle "Acc: user@corp.com"
+npm run mock:clear-reg                   # No account linked
 ```
 
 ### Inspect current mock state
 
 ```bash
-./mock-warp-cli show
+npm run mock:show
 ```
 
 ### Wiring it up manually (without `npm run dev`)

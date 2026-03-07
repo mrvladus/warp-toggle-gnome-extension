@@ -1,24 +1,24 @@
-import json from "@eslint/json";
+import json from '@eslint/json';
 
 export default [
   {
-    files: ["metadata.json"],
-    language: "json/json",
+    files: ['metadata.json'],
+    language: 'json/json',
     ...json.configs.recommended,
   },
   {
-    files: ["extension.js"],
+    files: ['extension.js'],
     languageOptions: {
-      ecmaVersion: "latest",
-      sourceType: "module",
+      ecmaVersion: 'latest',
+      sourceType: 'module',
     },
     rules: {
-      "no-unused-vars": [
-        "error",
+      'no-unused-vars': [
+        'error',
         {
-          argsIgnorePattern: "^_",
-          caughtErrorsIgnorePattern: "^_",
-          varsIgnorePattern: "^_",
+          argsIgnorePattern: '^_',
+          caughtErrorsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
         },
       ],
     },

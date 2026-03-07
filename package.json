@@ -8,7 +8,10 @@
     "build:uninstall": "./build uninstall",
     "build:zip": "./build zip",
     "lint": "eslint extension.js metadata.json",
-    "dev": "./build install && WARP_CLI=$(pwd)/mock-warp-cli dbus-run-session -- gnome-shell --devkit"
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "dev": "./build install && WARP_CLI=$(pwd)/mock-warp-cli dbus-run-session -- gnome-shell --devkit",
+    "prepare": "husky"
   },
   "dependencies": {
     "@girs/gjs": "^4.0.0-beta.39",
@@ -16,6 +19,8 @@
   },
   "devDependencies": {
     "@eslint/json": "^1.0.1",
-    "eslint": "^10.0.2"
+    "eslint": "^10.0.2",
+    "husky": "^9.1.7",
+    "prettier": "^3.8.1"
   }
 }

@@ -21,6 +21,7 @@ import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
+import * as MessageTray from 'resource:///org/gnome/shell/ui/messageTray.js';
 
 import {
   Extension,
@@ -57,8 +58,11 @@ const STATUS_CONNECTED = 'connected';
 const STATUS_CONNECTING = 'connecting';
 const STATUS_DISCONNECTED = 'disconnected';
 
-// command parameters
+// cli location and debug flag
 const WARP_CLI = GLib.getenv('WARP_CLI') || 'warp-cli';
+const DEBUG = false; // Boolean(GLib.getenv('WARP_CLI'));
+
+// command parameters
 const COMMAND_STATUS = 'status';
 const COMMAND_CONNECT = 'connect';
 const COMMAND_DISCONNECT = 'disconnect';
@@ -451,6 +455,22 @@ const WarpIndicator = GObject.registerClass(
 
 export default class WARPExtension extends Extension {
   enable() {
+    if (DEBUG) {
+      console.log(`[WARP Toggle] CLI: ${WARP_CLI}`);
+      const source = new MessageTray.Source({
+        title: WARP_TITLE,
+        iconName: ICON_CONNECTED,
+      });
+      Main.messageTray.add(source);
+      const notif = new MessageTray.Notification({
+        source,
+        title: `${WARP_TITLE} Toggle — debug`,
+        body: `CLI: ${WARP_CLI}`,
+        isTransient: false,
+      });
+      source.addNotification(notif);
+    }
+
     const cliAvailable = WARP_CLI.includes('/')
       ? GLib.file_test(WARP_CLI, GLib.FileTest.IS_EXECUTABLE)
       : Boolean(GLib.find_program_in_path(WARP_CLI));

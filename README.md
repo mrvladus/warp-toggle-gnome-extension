@@ -43,3 +43,9 @@ git clone https:github.com/mrvladus/warp-toggle-gnome-extension && cd warp-toggl
 ```
 
 Or manually remove this directory: `~/.local/share/gnome-shell/extensions/warptoggle@mrvladus.github.io`
+
+---
+
+### Contributing / Development
+
+See [DEV.md](DEV.md) for instructions on running a nested test session, using the mock CLI, code formatting, and the extension's state flow.

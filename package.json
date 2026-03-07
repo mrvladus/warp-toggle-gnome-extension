@@ -8,7 +8,22 @@
     "build:uninstall": "./build uninstall",
     "build:zip": "./build zip",
     "lint": "eslint extension.js metadata.json",
-    "dev": "dbus-run-session -- gnome-shell --devkit"
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "dev": "./build install && WARP_CLI=$(pwd)/mock-warp-cli dbus-run-session -- gnome-shell --devkit",
+    "mock:show": "./mock-warp-cli show",
+    "mock:connected": "./mock-warp-cli set-state connected",
+    "mock:disconnected": "./mock-warp-cli set-state disconnected",
+    "mock:connecting": "./mock-warp-cli set-state connecting",
+    "mock:disabled": "./mock-warp-cli set-state disabled",
+    "mock:no_route": "./mock-warp-cli set-state no_route",
+    "mock:offline": "./mock-warp-cli set-state offline",
+    "mock:error": "./mock-warp-cli set-state error",
+    "mock:not_registered": "./mock-warp-cli set-state not_registered",
+    "mock:org": "./mock-warp-cli set-org",
+    "mock:personal": "./mock-warp-cli set-personal",
+    "mock:clear-reg": "./mock-warp-cli clear-registration",
+    "prepare": "husky"
   },
   "dependencies": {
     "@girs/gjs": "^4.0.0-beta.39",
@@ -16,6 +31,8 @@
   },
   "devDependencies": {
     "@eslint/json": "^1.0.1",
-    "eslint": "^10.0.2"
+    "eslint": "^10.0.2",
+    "husky": "^9.1.7",
+    "prettier": "^3.8.1"
   }
 }

@@ -16,96 +16,99 @@
  * SPDX-License-Identifier: GPL-2.0-or-later
  */
 
-import GObject from "gi://GObject";
-import Gio from "gi://Gio";
-import GLib from "gi://GLib";
+import GObject from 'gi://GObject';
+import Gio from 'gi://Gio';
+import GLib from 'gi://GLib';
 
-import * as Main from "resource:///org/gnome/shell/ui/main.js";
+import * as Main from 'resource:///org/gnome/shell/ui/main.js';
+import * as MessageTray from 'resource:///org/gnome/shell/ui/messageTray.js';
 
 import {
   Extension,
   gettext as _,
-} from "resource:///org/gnome/shell/extensions/extension.js";
+} from 'resource:///org/gnome/shell/extensions/extension.js';
 import {
   QuickToggle,
   SystemIndicator,
-} from "resource:///org/gnome/shell/ui/quickSettings.js";
+} from 'resource:///org/gnome/shell/ui/quickSettings.js';
 
-const WARP_TITLE = "WARP";
+const WARP_TITLE = 'WARP';
 const STATUS_CHECK_INTERVAL_SECONDS = 10;
 
 // states
-const STATE_CONNECTED = "connected";
-const STATE_CONNECTING = "connecting";
-const STATE_DISCONNECTED = "disconnected";
-const STATE_DISABLED = "disabled";
-const STATE_NO_ROUTE = "no_route";
-const STATE_OFFLINE = "offline";
-const STATE_ERROR = "error";
-const STATE_NOT_REGISTERED = "not_registered";
+const STATE_CONNECTED = 'connected';
+const STATE_CONNECTING = 'connecting';
+const STATE_DISCONNECTED = 'disconnected';
+const STATE_DISABLED = 'disabled';
+const STATE_NO_ROUTE = 'no_route';
+const STATE_OFFLINE = 'offline';
+const STATE_ERROR = 'error';
+const STATE_NOT_REGISTERED = 'not_registered';
 
 // icons and states
-const ICON_CONNECTED = "network-vpn-symbolic";
-const ICON_CONNECTING = "network-vpn-acquiring-symbolic";
-const ICON_DISCONNECTED = "network-vpn-disconnected-symbolic";
-const ICON_DISABLED = "network-vpn-disabled-symbolic";
-const ICON_NO_ROUTE = "network-vpn-no-route-symbolic";
-const ICON_OFFLINE = "network-vpn-offline-symbolic";
-const ICON_ERROR = "network-vpn-error-symbolic";
+const ICON_CONNECTED = 'network-vpn-symbolic';
+const ICON_CONNECTING = 'network-vpn-acquiring-symbolic';
+const ICON_DISCONNECTED = 'network-vpn-disconnected-symbolic';
+const ICON_DISABLED = 'network-vpn-disabled-symbolic';
+const ICON_NO_ROUTE = 'network-vpn-no-route-symbolic';
+const ICON_OFFLINE = 'network-vpn-offline-symbolic';
+const ICON_ERROR = 'network-vpn-error-symbolic';
 
-const STATUS_CONNECTED = "connected";
-const STATUS_CONNECTING = "connecting";
-const STATUS_DISCONNECTED = "disconnected";
+const STATUS_CONNECTED = 'connected';
+const STATUS_CONNECTING = 'connecting';
+const STATUS_DISCONNECTED = 'disconnected';
+
+// cli location and debug flag
+const WARP_CLI = GLib.getenv('WARP_CLI') || 'warp-cli';
+const DEBUG = false; // Boolean(GLib.getenv('WARP_CLI'));
 
 // command parameters
-const WARP_CLI = "warp-cli";
-const COMMAND_STATUS = "status";
-const COMMAND_CONNECT = "connect";
-const COMMAND_DISCONNECT = "disconnect";
-const COMMAND_REGISTRATION_ORG = "registration organization";
-const COMMAND_REGISTRATION_SHOW = "registration show";
+const COMMAND_STATUS = 'status';
+const COMMAND_CONNECT = 'connect';
+const COMMAND_DISCONNECT = 'disconnect';
+const COMMAND_REGISTRATION_ORG = 'registration organization';
+const COMMAND_REGISTRATION_SHOW = 'registration show';
 
 // registration setup URL
-const URL_SETUP_GUIDE = "https://developers.cloudflare.com/warp-client/get-started/linux/";
+const URL_SETUP_GUIDE =
+  'https://developers.cloudflare.com/warp-client/get-started/linux/';
 
-const ANIMATION_FRAMES = Array.from({ length: 14 }, (_, i) =>
-  `nm-vpn-connecting${String(i + 1).padStart(2, "0")}-symbolic`
+const ANIMATION_FRAMES = Array.from(
+  { length: 14 },
+  (_, i) => `nm-vpn-connecting${String(i + 1).padStart(2, '0')}-symbolic`,
 );
 const ANIMATION_FRAME_INTERVAL_MS = 100;
 
 // subtitles
-const SUBTITLE_CONNECTING = "Connecting\u2026";
-const SUBTITLE_SERVICE_NOT_RUNNING = "Service not running";
-const SUBTITLE_NO_ROUTE = "No route to host";
-const SUBTITLE_OFFLINE = "Offline";
-const SUBTITLE_ERROR = "Unknown error";
+const SUBTITLE_CONNECTING = 'Connecting\u2026';
+const SUBTITLE_SERVICE_NOT_RUNNING = 'Service not running';
+const SUBTITLE_NO_ROUTE = 'No route to host';
+const SUBTITLE_OFFLINE = 'Offline';
+const SUBTITLE_ERROR = 'Unknown error';
 
-const SUBTITLE_NOT_REGISTERED = "Not registered \u00b7 Click to set up";
-const SUBTITLE_PREFIX_ORG = "Org: ";
-const SUBTITLE_PREFIX_PERSONAL = "Acc: ";
+const SUBTITLE_NOT_REGISTERED = 'Not registered \u00b7 Click to set up';
+const SUBTITLE_PREFIX_ORG = 'Org: ';
+const SUBTITLE_PREFIX_PERSONAL = 'Acc: ';
 
 // error strings
-const WARP_CLI_NOT_FOUND = "warp-cli command not found";
+const WARP_CLI_NOT_FOUND = 'warp-cli command not found';
 
 const DISABLED_ERROR_PATTERNS = [
-  "no such file or directory",
-  "failed to execute child process",
-  "unable to connect",
-  "daemon",
-  "service not running",
+  'no such file or directory',
+  'failed to execute child process',
+  'unable to connect',
+  'daemon',
+  'service not running',
 ];
 
 const NO_ROUTE_ERROR_PATTERNS = [
-  "network is unreachable",
-  "no route to host",
-  "could not resolve host",
-  "name or service not known",
+  'network is unreachable',
+  'no route to host',
+  'could not resolve host',
+  'name or service not known',
 ];
 
-const OFFLINE_ERROR_PATTERNS = [
-  "offline",
-  "timed out",
-];
+const OFFLINE_ERROR_PATTERNS = ['offline', 'timed out'];
 
 function getStateAppearance(state) {
   switch (state) {
@@ -155,7 +158,7 @@ function getStateSubtitle(state) {
 // identifiable info is available.
 async function getVpnProvider() {
   const isNotRegistered = (msg) =>
-    msg.includes("not registered") || msg.includes("registration missing");
+    msg.includes('not registered') || msg.includes('registration missing');
 
   try {
     const org = await runCommand(COMMAND_REGISTRATION_ORG);
@@ -241,7 +244,7 @@ async function runCommand(cmd) {
   return new Promise((resolve, reject) => {
     try {
       const proc = new Gio.Subprocess({
-        argv: [WARP_CLI, ...cmd.split(" ")],
+        argv: [WARP_CLI, ...cmd.split(' ')],
         flags:
           Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE,
       });
@@ -253,7 +256,7 @@ async function runCommand(cmd) {
             reject(stderr);
             return;
           }
-          resolve(stdout ? stdout.trim() : "");
+          resolve(stdout ? stdout.trim() : '');
         } catch (e) {
           reject(e);
         }
@@ -288,19 +291,21 @@ const WarpToggle = GObject.registerClass(
       }
 
       // Fetch provider label immediately so it shows before the first status poll
-      getVpnProvider().then((p) => {
-        this._providerSubtitle = p;
-        if (!getStateSubtitle(this._state)) {
-          this.subtitle = p;
-        }
-      }).catch(() => {});
+      getVpnProvider()
+        .then((p) => {
+          this._providerSubtitle = p;
+          if (!getStateSubtitle(this._state)) {
+            this.subtitle = p;
+          }
+        })
+        .catch(() => {});
 
       this._setState(STATE_DISCONNECTED);
       this._updateStatus(); // Initial check
       this._startCheckingStatus(); // Start periodic updates
 
       // Monitor button state changes
-      this.connect("clicked", async () => {
+      this.connect('clicked', async () => {
         if (this._notRegistered) {
           Gio.AppInfo.launch_default_for_uri(URL_SETUP_GUIDE, null);
           return;
@@ -339,7 +344,7 @@ const WarpToggle = GObject.registerClass(
       this._animationTimerId = GLib.timeout_add(
         GLib.PRIORITY_DEFAULT,
         ANIMATION_FRAME_INTERVAL_MS,
-        tick
+        tick,
       );
     }
 
@@ -450,10 +455,31 @@ const WarpIndicator = GObject.registerClass(
 
 export default class WARPExtension extends Extension {
   enable() {
-    const cliAvailable = Boolean(GLib.find_program_in_path(WARP_CLI));
+    if (DEBUG) {
+      console.log(`[WARP Toggle] CLI: ${WARP_CLI}`);
+      const source = new MessageTray.Source({
+        title: WARP_TITLE,
+        iconName: ICON_CONNECTED,
+      });
+      Main.messageTray.add(source);
+      const notif = new MessageTray.Notification({
+        source,
+        title: `${WARP_TITLE} Toggle — debug`,
+        body: `CLI: ${WARP_CLI}`,
+        isTransient: false,
+      });
+      source.addNotification(notif);
+    }
+
+    const cliAvailable = WARP_CLI.includes('/')
+      ? GLib.file_test(WARP_CLI, GLib.FileTest.IS_EXECUTABLE)
+      : Boolean(GLib.find_program_in_path(WARP_CLI));
     if (!cliAvailable) {
       console.error(WARP_CLI_NOT_FOUND);
-      Main.notifyError(`${WARP_TITLE} Toggle`, WARP_CLI_NOT_FOUND);
+      Main.notifyError(
+        `${WARP_TITLE} Toggle`,
+        `${WARP_CLI_NOT_FOUND}: ${WARP_CLI}`,
+      );
     }
 
     // Add the indicator to the system panel

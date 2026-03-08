@@ -55,8 +55,11 @@ export default class WARPPreferences extends ExtensionPreferences {
       'show-indicator',
       indicatorRow,
       'active',
-      Gio.SettingsBindFlags.DEFAULT,
+      Gio.SettingsBindFlags.GET,
     );
+    indicatorRow.connect('notify::active', () => {
+      settings.set_boolean('show-indicator', indicatorRow.active);
+    });
 
     // Behaviour group
     const behaviourGroup = new Adw.PreferencesGroup({
@@ -79,11 +82,19 @@ export default class WARPPreferences extends ExtensionPreferences {
     });
     behaviourGroup.add(pollIntervalRow);
 
+    // Use one-way GET bind (settings → widget) to avoid the bidirectional
+    // bind writing back an uninitialised double value when GSettings fires
+    // a changed notification (e.g. triggered by the extension restarting
+    // its polling timer).  The widget → settings direction is handled
+    // explicitly via notify::value.
     settings.bind(
       'poll-interval',
       pollIntervalRow,
       'value',
-      Gio.SettingsBindFlags.DEFAULT,
+      Gio.SettingsBindFlags.GET,
     );
+    pollIntervalRow.connect('notify::value', () => {
+      settings.set_int('poll-interval', pollIntervalRow.value);
+    });
   }
 }

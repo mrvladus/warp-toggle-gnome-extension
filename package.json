@@ -11,6 +11,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "dev": "./build install && WARP_CLI=$(pwd)/mock-warp-cli dbus-run-session -- gnome-shell --devkit",
+    "prefs": "gnome-extensions prefs warptoggle@mrvladus.github.io",
     "mock:show": "./mock-warp-cli show",
     "mock:connected": "./mock-warp-cli set-state connected",
     "mock:disconnected": "./mock-warp-cli set-state disconnected",

@@ -8,6 +8,7 @@ if [ "$1" == "install" ]; then
     rm -rf $DESTDIR
     mkdir -p $DESTDIR
     cp -r src/. $DESTDIR
+    glib-compile-schemas $DESTDIR/schemas/
     echo "Success"
     exit 0
 fi
@@ -22,7 +23,7 @@ fi
 if [ "$1" == "zip" ]; then
     echo "Creating zip"
     rm -rf "${NAME}.zip"
-    cd src && zip "../${NAME}.zip" ./* && cd ..
+    cd src && zip -r "../${NAME}.zip" . -x "*/gschemas.compiled" && cd ..
     echo "Success"
     exit 0
 fi

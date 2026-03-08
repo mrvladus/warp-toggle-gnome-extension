@@ -7,6 +7,11 @@
       <summary>Show status indicator</summary>
       <description>Show a status icon in the top bar alongside the system indicators.</description>
     </key>
+    <key name="show-account-details" type="b">
+      <default>true</default>
+      <summary>Show account details</summary>
+      <description>Fetch and display the registered account or organisation name in the toggle subtitle.</description>
+    </key>
     <key name="poll-interval" type="i">
       <range min="1" max="3600"/>
       <default>10</default>

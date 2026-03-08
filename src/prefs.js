@@ -55,11 +55,24 @@ export default class WARPPreferences extends ExtensionPreferences {
       'show-indicator',
       indicatorRow,
       'active',
-      Gio.SettingsBindFlags.GET,
+      Gio.SettingsBindFlags.DEFAULT,
     );
-    indicatorRow.connect('notify::active', () => {
-      settings.set_boolean('show-indicator', indicatorRow.active);
+
+    const accountDetailsRow = new Adw.SwitchRow({
+      title: _('Show account details'),
+      subtitle: _(
+        'Display the registered account or organisation name in the toggle subtitle',
+      ),
+      active: settings.get_boolean('show-account-details'),
     });
+    appearanceGroup.add(accountDetailsRow);
+
+    settings.bind(
+      'show-account-details',
+      accountDetailsRow,
+      'active',
+      Gio.SettingsBindFlags.DEFAULT,
+    );
 
     // Behaviour group
     const behaviourGroup = new Adw.PreferencesGroup({

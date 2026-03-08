@@ -292,14 +292,16 @@ const WarpToggle = GObject.registerClass(
       }
 
       // Fetch provider label immediately so it shows before the first status poll
-      getVpnProvider()
-        .then((p) => {
-          this._providerSubtitle = p;
-          if (!getStateSubtitle(this._state)) {
-            this.subtitle = p;
-          }
-        })
-        .catch(() => {});
+      if (this._settings.get_boolean('show-account-details')) {
+        getVpnProvider()
+          .then((p) => {
+            this._providerSubtitle = p;
+            if (!getStateSubtitle(this._state)) {
+              this.subtitle = p;
+            }
+          })
+          .catch(() => {});
+      }
 
       this._setState(STATE_DISCONNECTED);
       this._updateStatus(); // Initial check
@@ -311,6 +313,28 @@ const WarpToggle = GObject.registerClass(
         () => {
           this._stopCheckingStatus();
           this._startCheckingStatus();
+        },
+      );
+
+      // Show or clear account details when the preference toggles.
+      this._accountDetailsChangedId = this._settings.connect(
+        'changed::show-account-details',
+        () => {
+          if (this._settings.get_boolean('show-account-details')) {
+            getVpnProvider()
+              .then((p) => {
+                this._providerSubtitle = p;
+                if (!getStateSubtitle(this._state)) {
+                  this.subtitle = p;
+                }
+              })
+              .catch(() => {});
+          } else {
+            this._providerSubtitle = null;
+            if (!getStateSubtitle(this._state)) {
+              this.subtitle = null;
+            }
+          }
         },
       );
 
@@ -395,9 +419,12 @@ const WarpToggle = GObject.registerClass(
     async _updateStatus() {
       try {
         // TODO: not ideal running Promise.all and the vpn provider here all the time
+        const showAccount = this._settings
+          ? this._settings.get_boolean('show-account-details')
+          : true;
         const [state, provider] = await Promise.all([
           this._getWarpState(),
-          getVpnProvider(),
+          showAccount ? getVpnProvider() : Promise.resolve(null),
         ]);
         if (provider === SUBTITLE_NOT_REGISTERED && state !== STATE_DISABLED) {
           this._providerSubtitle = null;
@@ -444,6 +471,10 @@ const WarpToggle = GObject.registerClass(
       if (this._pollIntervalChangedId) {
         this._settings.disconnect(this._pollIntervalChangedId);
         this._pollIntervalChangedId = null;
+      }
+      if (this._accountDetailsChangedId) {
+        this._settings.disconnect(this._accountDetailsChangedId);
+        this._accountDetailsChangedId = null;
       }
       super.destroy();
     }

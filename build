@@ -7,8 +7,7 @@ if [ "$1" == "install" ]; then
     echo "Installing WARP Toggle extension"
     rm -rf $DESTDIR
     mkdir -p $DESTDIR
-    cp extension.js $DESTDIR
-    cp metadata.json $DESTDIR
+    cp -r src/. $DESTDIR
     echo "Success"
     exit 0
 fi
@@ -23,7 +22,7 @@ fi
 if [ "$1" == "zip" ]; then
     echo "Creating zip"
     rm -rf "${NAME}.zip"
-    zip "${NAME}.zip" extension.js metadata.json
+    cd src && zip "../${NAME}.zip" ./* && cd ..
     echo "Success"
     exit 0
 fi

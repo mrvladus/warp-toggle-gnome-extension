@@ -431,22 +431,37 @@ const WarpToggle = GObject.registerClass(
 
 const WarpIndicator = GObject.registerClass(
   class WarpIndicator extends SystemIndicator {
-    constructor(cliAvailable) {
+    constructor(cliAvailable, settings) {
       super();
 
-      // Create the indicator icon
+      this._settings = settings;
+
+      // Create the indicator icon; honour the show-indicator preference.
       this._indicator = this._addIndicator();
-      this._indicator.visible = true;
+      this._indicator.visible = settings.get_boolean('show-indicator');
+
+      // Re-apply the preference whenever it changes in prefs.
+      this._settingsChangedId = settings.connect(
+        'changed::show-indicator',
+        () => {
+          this._indicator.visible =
+            this._settings.get_boolean('show-indicator');
+        },
+      );
 
       // Create the toggle button and sync indicator appearance with its state.
       this._toggle = new WarpToggle(cliAvailable, (appearance) => {
         this._indicator.iconName = appearance.iconName;
-        this._indicator.visible = appearance.visible;
+        // Only show/hide the indicator based on state when the preference allows it.
+        if (this._settings.get_boolean('show-indicator')) {
+          this._indicator.visible = appearance.visible;
+        }
       });
       this.quickSettingsItems.push(this._toggle);
     }
 
     destroy() {
+      this._settings.disconnect(this._settingsChangedId);
       this.quickSettingsItems.forEach((item) => item.destroy());
       super.destroy();
     }
@@ -482,8 +497,10 @@ export default class WARPExtension extends Extension {
       );
     }
 
+    this._settings = this.getSettings();
+
     // Add the indicator to the system panel
-    this._indicator = new WarpIndicator(cliAvailable);
+    this._indicator = new WarpIndicator(cliAvailable, this._settings);
     Main.panel.statusArea.quickSettings.addExternalIndicator(this._indicator);
   }
 

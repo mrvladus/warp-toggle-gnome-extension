@@ -7,5 +7,11 @@
       <summary>Show status indicator</summary>
       <description>Show a status icon in the top bar alongside the system indicators.</description>
     </key>
+    <key name="poll-interval" type="i">
+      <range min="1" max="3600"/>
+      <default>10</default>
+      <summary>Status polling interval</summary>
+      <description>How often (in seconds) the extension checks the WARP connection status.</description>
+    </key>
   </schema>
 </schemalist>

@@ -33,7 +33,7 @@ import {
 } from 'resource:///org/gnome/shell/ui/quickSettings.js';
 
 const WARP_TITLE = 'WARP';
-const STATUS_CHECK_INTERVAL_SECONDS = 10;
+const STATUS_CHECK_INTERVAL_SECONDS_DEFAULT = 10;
 
 // states
 const STATE_CONNECTED = 'connected';
@@ -269,7 +269,7 @@ async function runCommand(cmd) {
 
 const WarpToggle = GObject.registerClass(
   class WarpToggle extends QuickToggle {
-    constructor(cliAvailable, onStateChange) {
+    constructor(cliAvailable, settings, onStateChange) {
       super({
         title: _(WARP_TITLE),
         iconName: ICON_DISCONNECTED,
@@ -278,6 +278,7 @@ const WarpToggle = GObject.registerClass(
       });
 
       this._onStateChange = onStateChange;
+      this._settings = settings;
       this._state = null;
       this._cliAvailable = cliAvailable;
       this._statusCheckId = null; // Store timeout ID
@@ -303,6 +304,15 @@ const WarpToggle = GObject.registerClass(
       this._setState(STATE_DISCONNECTED);
       this._updateStatus(); // Initial check
       this._startCheckingStatus(); // Start periodic updates
+
+      // Restart the polling timer whenever the interval setting changes.
+      this._pollIntervalChangedId = this._settings.connect(
+        'changed::poll-interval',
+        () => {
+          this._stopCheckingStatus();
+          this._startCheckingStatus();
+        },
+      );
 
       // Monitor button state changes
       this.connect('clicked', async () => {
@@ -403,14 +413,24 @@ const WarpToggle = GObject.registerClass(
 
     _startCheckingStatus() {
       if (this._statusCheckId) return; // Prevent duplicate timers
+      const interval = this._settings
+        ? this._settings.get_int('poll-interval')
+        : STATUS_CHECK_INTERVAL_SECONDS_DEFAULT;
       this._statusCheckId = GLib.timeout_add_seconds(
         GLib.PRIORITY_DEFAULT,
-        STATUS_CHECK_INTERVAL_SECONDS,
+        interval,
         () => {
           this._updateStatus();
           return GLib.SOURCE_CONTINUE;
         },
       );
+    }
+
+    _stopCheckingStatus() {
+      if (this._statusCheckId) {
+        GLib.source_remove(this._statusCheckId);
+        this._statusCheckId = null;
+      }
     }
 
     async _getWarpState() {
@@ -420,9 +440,10 @@ const WarpToggle = GObject.registerClass(
 
     destroy() {
       this._stopConnectingAnimation();
-      if (this._statusCheckId) {
-        GLib.source_remove(this._statusCheckId);
-        this._statusCheckId = null;
+      this._stopCheckingStatus();
+      if (this._pollIntervalChangedId) {
+        this._settings.disconnect(this._pollIntervalChangedId);
+        this._pollIntervalChangedId = null;
       }
       super.destroy();
     }
@@ -450,7 +471,7 @@ const WarpIndicator = GObject.registerClass(
       );
 
       // Create the toggle button and sync indicator appearance with its state.
-      this._toggle = new WarpToggle(cliAvailable, (appearance) => {
+      this._toggle = new WarpToggle(cliAvailable, settings, (appearance) => {
         this._indicator.iconName = appearance.iconName;
         // Only show/hide the indicator based on state when the preference allows it.
         if (this._settings.get_boolean('show-indicator')) {

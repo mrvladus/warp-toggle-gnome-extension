@@ -18,6 +18,7 @@
 
 import Adw from 'gi://Adw';
 import Gio from 'gi://Gio';
+import Gtk from 'gi://Gtk';
 
 import {
   ExtensionPreferences,
@@ -46,6 +47,7 @@ export default class WARPPreferences extends ExtensionPreferences {
       subtitle: _(
         'Show a status icon in the top bar alongside system indicators',
       ),
+      active: settings.get_boolean('show-indicator'),
     });
     appearanceGroup.add(indicatorRow);
 
@@ -53,6 +55,34 @@ export default class WARPPreferences extends ExtensionPreferences {
       'show-indicator',
       indicatorRow,
       'active',
+      Gio.SettingsBindFlags.DEFAULT,
+    );
+
+    // Behaviour group
+    const behaviourGroup = new Adw.PreferencesGroup({
+      title: _('Behaviour'),
+    });
+    generalPage.add(behaviourGroup);
+
+    const pollIntervalRow = new Adw.SpinRow({
+      title: _('Polling interval'),
+      subtitle: _(
+        'How often the extension checks the WARP connection status (seconds)',
+      ),
+      adjustment: new Gtk.Adjustment({
+        value: settings.get_int('poll-interval'),
+        lower: 1,
+        upper: 3600,
+        step_increment: 1,
+        page_increment: 10,
+      }),
+    });
+    behaviourGroup.add(pollIntervalRow);
+
+    settings.bind(
+      'poll-interval',
+      pollIntervalRow,
+      'value',
       Gio.SettingsBindFlags.DEFAULT,
     );
   }

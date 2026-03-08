@@ -74,6 +74,48 @@ export default class WARPPreferences extends ExtensionPreferences {
       Gio.SettingsBindFlags.DEFAULT,
     );
 
+    // warp-cli group
+    const warpCliGroup = new Adw.PreferencesGroup({
+      title: _('warp-cli'),
+    });
+    generalPage.add(warpCliGroup);
+
+    const useCustomCliRow = new Adw.SwitchRow({
+      title: _('Use custom warp-cli path'),
+      subtitle: _('Use a custom executable instead of the default warp-cli'),
+      active: settings.get_boolean('use-custom-warp-cli'),
+    });
+    warpCliGroup.add(useCustomCliRow);
+
+    settings.bind(
+      'use-custom-warp-cli',
+      useCustomCliRow,
+      'active',
+      Gio.SettingsBindFlags.DEFAULT,
+    );
+
+    const customCliPathRow = new Adw.EntryRow({
+      title: _('Custom warp-cli path'),
+      text: settings.get_string('custom-warp-cli-path'),
+      sensitive: settings.get_boolean('use-custom-warp-cli'),
+    });
+    warpCliGroup.add(customCliPathRow);
+
+    settings.bind(
+      'custom-warp-cli-path',
+      customCliPathRow,
+      'text',
+      Gio.SettingsBindFlags.DEFAULT,
+    );
+
+    // Enable/disable the path entry based on the toggle.
+    settings.bind(
+      'use-custom-warp-cli',
+      customCliPathRow,
+      'sensitive',
+      Gio.SettingsBindFlags.GET,
+    );
+
     // Behaviour group
     const behaviourGroup = new Adw.PreferencesGroup({
       title: _('Behaviour'),

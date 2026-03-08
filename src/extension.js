@@ -59,7 +59,7 @@ const STATUS_CONNECTING = 'connecting';
 const STATUS_DISCONNECTED = 'disconnected';
 
 // cli location and debug flag
-const WARP_CLI = GLib.getenv('WARP_CLI') || 'warp-cli';
+const WARP_CLI_DEFAULT = GLib.getenv('WARP_CLI') || 'warp-cli';
 const DEBUG = false; // Boolean(GLib.getenv('WARP_CLI'));
 
 // command parameters
@@ -151,17 +151,28 @@ function getStateSubtitle(state) {
   }
 }
 
+function getWarpCli(settings) {
+  if (
+    settings &&
+    settings.get_boolean('use-custom-warp-cli') &&
+    settings.get_string('custom-warp-cli-path')
+  ) {
+    return settings.get_string('custom-warp-cli-path');
+  }
+  return WARP_CLI_DEFAULT;
+}
+
 // Fetches the VPN provider label via `warp-cli registration organization`
 // (Teams) or `registration show` (personal).
 // Returns a prefixed string: "Organization: <name>" or "Personal: <name>",
 // SUBTITLE_NOT_REGISTERED when no account is linked yet, or null when no
 // identifiable info is available.
-async function getVpnProvider() {
+async function getVpnProvider(warpCli) {
   const isNotRegistered = (msg) =>
     msg.includes('not registered') || msg.includes('registration missing');
 
   try {
-    const org = await runCommand(COMMAND_REGISTRATION_ORG);
+    const org = await runCommand(COMMAND_REGISTRATION_ORG, warpCli);
     if (org) {
       return SUBTITLE_PREFIX_ORG + org;
     }
@@ -173,7 +184,7 @@ async function getVpnProvider() {
   }
 
   try {
-    const info = await runCommand(COMMAND_REGISTRATION_SHOW);
+    const info = await runCommand(COMMAND_REGISTRATION_SHOW, warpCli);
     const orgMatch = info.match(/^organization:\s*(.+)/im);
     if (orgMatch) {
       return SUBTITLE_PREFIX_ORG + orgMatch[1].trim();
@@ -240,11 +251,11 @@ function classifyWarpFailure(err) {
 }
 
 // Executes a shell command and returns its stdout output.
-async function runCommand(cmd) {
+async function runCommand(cmd, warpCli = WARP_CLI_DEFAULT) {
   return new Promise((resolve, reject) => {
     try {
       const proc = new Gio.Subprocess({
-        argv: [WARP_CLI, ...cmd.split(' ')],
+        argv: [warpCli, ...cmd.split(' ')],
         flags:
           Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE,
       });
@@ -281,6 +292,7 @@ const WarpToggle = GObject.registerClass(
       this._settings = settings;
       this._state = null;
       this._cliAvailable = cliAvailable;
+      this._warpCli = getWarpCli(settings);
       this._statusCheckId = null; // Store timeout ID
       this._providerSubtitle = null; // Cached provider label
       this._animationTimerId = null;
@@ -293,7 +305,7 @@ const WarpToggle = GObject.registerClass(
 
       // Fetch provider label immediately so it shows before the first status poll
       if (this._settings.get_boolean('show-account-details')) {
-        getVpnProvider()
+        getVpnProvider(this._warpCli)
           .then((p) => {
             this._providerSubtitle = p;
             if (!getStateSubtitle(this._state)) {
@@ -316,12 +328,22 @@ const WarpToggle = GObject.registerClass(
         },
       );
 
+      // React to warp-cli path changes.
+      this._warpCliChangedId = this._settings.connect(
+        'changed::use-custom-warp-cli',
+        () => this._onWarpCliChanged(),
+      );
+      this._warpCliPathChangedId = this._settings.connect(
+        'changed::custom-warp-cli-path',
+        () => this._onWarpCliChanged(),
+      );
+
       // Show or clear account details when the preference toggles.
       this._accountDetailsChangedId = this._settings.connect(
         'changed::show-account-details',
         () => {
           if (this._settings.get_boolean('show-account-details')) {
-            getVpnProvider()
+            getVpnProvider(this._warpCli)
               .then((p) => {
                 this._providerSubtitle = p;
                 if (!getStateSubtitle(this._state)) {
@@ -351,7 +373,7 @@ const WarpToggle = GObject.registerClass(
         );
 
         try {
-          await runCommand(command);
+          await runCommand(command, this._warpCli);
         } catch (err) {
           this._setState(classifyWarpFailure(err));
           return;
@@ -416,6 +438,13 @@ const WarpToggle = GObject.registerClass(
       }
     }
 
+    _onWarpCliChanged() {
+      this._warpCli = getWarpCli(this._settings);
+      this._stopCheckingStatus();
+      this._updateStatus();
+      this._startCheckingStatus();
+    }
+
     async _updateStatus() {
       try {
         // TODO: not ideal running Promise.all and the vpn provider here all the time
@@ -424,7 +453,7 @@ const WarpToggle = GObject.registerClass(
           : true;
         const [state, provider] = await Promise.all([
           this._getWarpState(),
-          showAccount ? getVpnProvider() : Promise.resolve(null),
+          showAccount ? getVpnProvider(this._warpCli) : Promise.resolve(null),
         ]);
         if (provider === SUBTITLE_NOT_REGISTERED && state !== STATE_DISABLED) {
           this._providerSubtitle = null;
@@ -461,7 +490,7 @@ const WarpToggle = GObject.registerClass(
     }
 
     async _getWarpState() {
-      const status = await runCommand(COMMAND_STATUS);
+      const status = await runCommand(COMMAND_STATUS, this._warpCli);
       return parseWarpStatus(status);
     }
 
@@ -475,6 +504,14 @@ const WarpToggle = GObject.registerClass(
       if (this._accountDetailsChangedId) {
         this._settings.disconnect(this._accountDetailsChangedId);
         this._accountDetailsChangedId = null;
+      }
+      if (this._warpCliChangedId) {
+        this._settings.disconnect(this._warpCliChangedId);
+        this._warpCliChangedId = null;
+      }
+      if (this._warpCliPathChangedId) {
+        this._settings.disconnect(this._warpCliPathChangedId);
+        this._warpCliPathChangedId = null;
       }
       super.destroy();
     }
@@ -523,7 +560,7 @@ const WarpIndicator = GObject.registerClass(
 export default class WARPExtension extends Extension {
   enable() {
     if (DEBUG) {
-      console.log(`[WARP Toggle] CLI: ${WARP_CLI}`);
+      console.log(`[WARP Toggle] CLI: ${WARP_CLI_DEFAULT}`);
       const source = new MessageTray.Source({
         title: WARP_TITLE,
         iconName: ICON_CONNECTED,
@@ -532,24 +569,25 @@ export default class WARPExtension extends Extension {
       const notif = new MessageTray.Notification({
         source,
         title: `${WARP_TITLE} Toggle — debug`,
-        body: `CLI: ${WARP_CLI}`,
+        body: `CLI: ${WARP_CLI_DEFAULT}`,
         isTransient: false,
       });
       source.addNotification(notif);
     }
 
-    const cliAvailable = WARP_CLI.includes('/')
-      ? GLib.file_test(WARP_CLI, GLib.FileTest.IS_EXECUTABLE)
-      : Boolean(GLib.find_program_in_path(WARP_CLI));
+    this._settings = this.getSettings();
+
+    const warpCli = getWarpCli(this._settings);
+    const cliAvailable = warpCli.includes('/')
+      ? GLib.file_test(warpCli, GLib.FileTest.IS_EXECUTABLE)
+      : Boolean(GLib.find_program_in_path(warpCli));
     if (!cliAvailable) {
       console.error(WARP_CLI_NOT_FOUND);
       Main.notifyError(
         `${WARP_TITLE} Toggle`,
-        `${WARP_CLI_NOT_FOUND}: ${WARP_CLI}`,
+        `${WARP_CLI_NOT_FOUND}: ${warpCli}`,
       );
     }
-
-    this._settings = this.getSettings();
 
     // Add the indicator to the system panel
     this._indicator = new WarpIndicator(cliAvailable, this._settings);

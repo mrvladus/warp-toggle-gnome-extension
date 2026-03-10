@@ -36,11 +36,11 @@ export default class WARPPreferences extends ExtensionPreferences {
     });
     window.add(generalPage);
 
-    // Appearance group
-    const appearanceGroup = new Adw.PreferencesGroup({
-      title: _('Appearance'),
+    // Indicator group
+    const indicatorGroup = new Adw.PreferencesGroup({
+      title: _('Indicator'),
     });
-    generalPage.add(appearanceGroup);
+    generalPage.add(indicatorGroup);
 
     const indicatorRow = new Adw.SwitchRow({
       title: _('Show status indicator'),
@@ -49,7 +49,7 @@ export default class WARPPreferences extends ExtensionPreferences {
       ),
       active: settings.get_boolean('show-indicator'),
     });
-    appearanceGroup.add(indicatorRow);
+    indicatorGroup.add(indicatorRow);
 
     settings.bind(
       'show-indicator',
@@ -57,6 +57,41 @@ export default class WARPPreferences extends ExtensionPreferences {
       'active',
       Gio.SettingsBindFlags.DEFAULT,
     );
+
+    // Per-state indicator toggles
+    const stateIndicators = [
+      { key: 'indicator-connected', title: _('Connected') },
+      { key: 'indicator-connecting', title: _('Connecting') },
+      { key: 'indicator-disconnected', title: _('Disconnected') },
+      { key: 'indicator-disabled', title: _('Service not running') },
+      { key: 'indicator-no-route', title: _('No route to host') },
+      { key: 'indicator-offline', title: _('Offline') },
+      { key: 'indicator-error', title: _('Error') },
+      { key: 'indicator-not-registered', title: _('Not registered') },
+    ];
+
+    for (const { key, title } of stateIndicators) {
+      const row = new Adw.SwitchRow({
+        title,
+        active: settings.get_boolean(key),
+        sensitive: settings.get_boolean('show-indicator'),
+      });
+      indicatorGroup.add(row);
+
+      settings.bind(key, row, 'active', Gio.SettingsBindFlags.DEFAULT);
+      settings.bind(
+        'show-indicator',
+        row,
+        'sensitive',
+        Gio.SettingsBindFlags.GET,
+      );
+    }
+
+    // Appearance group
+    const appearanceGroup = new Adw.PreferencesGroup({
+      title: _('Appearance'),
+    });
+    generalPage.add(appearanceGroup);
 
     const accountDetailsRow = new Adw.SwitchRow({
       title: _('Show account details'),

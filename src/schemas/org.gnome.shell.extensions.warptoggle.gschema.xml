@@ -7,6 +7,46 @@
       <summary>Show status indicator</summary>
       <description>Show a status icon in the top bar alongside the system indicators.</description>
     </key>
+    <key name="indicator-connected" type="b">
+      <default>true</default>
+      <summary>Show indicator when connected</summary>
+      <description>Show the status indicator when WARP is connected.</description>
+    </key>
+    <key name="indicator-connecting" type="b">
+      <default>true</default>
+      <summary>Show indicator when connecting</summary>
+      <description>Show the status indicator when WARP is connecting.</description>
+    </key>
+    <key name="indicator-disconnected" type="b">
+      <default>true</default>
+      <summary>Show indicator when disconnected</summary>
+      <description>Show the status indicator when WARP is disconnected.</description>
+    </key>
+    <key name="indicator-disabled" type="b">
+      <default>true</default>
+      <summary>Show indicator when disabled</summary>
+      <description>Show the status indicator when the WARP service is not running.</description>
+    </key>
+    <key name="indicator-no-route" type="b">
+      <default>true</default>
+      <summary>Show indicator when no route</summary>
+      <description>Show the status indicator when there is no route to host.</description>
+    </key>
+    <key name="indicator-offline" type="b">
+      <default>true</default>
+      <summary>Show indicator when offline</summary>
+      <description>Show the status indicator when the system is offline.</description>
+    </key>
+    <key name="indicator-error" type="b">
+      <default>true</default>
+      <summary>Show indicator on error</summary>
+      <description>Show the status indicator when an unknown error occurs.</description>
+    </key>
+    <key name="indicator-not-registered" type="b">
+      <default>true</default>
+      <summary>Show indicator when not registered</summary>
+      <description>Show the status indicator when WARP is not registered.</description>
+    </key>
     <key name="show-account-details" type="b">
       <default>true</default>
       <summary>Show account details</summary>

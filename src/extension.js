@@ -87,6 +87,18 @@ const SUBTITLE_OFFLINE = 'Offline';
 const SUBTITLE_ERROR = 'Unknown error';
 
 const SUBTITLE_NOT_REGISTERED = 'Not registered \u00b7 Click to set up';
+
+// Map each state to its per-state indicator settings key.
+const STATE_INDICATOR_KEY = {
+  [STATE_CONNECTED]: 'indicator-connected',
+  [STATE_CONNECTING]: 'indicator-connecting',
+  [STATE_DISCONNECTED]: 'indicator-disconnected',
+  [STATE_DISABLED]: 'indicator-disabled',
+  [STATE_NO_ROUTE]: 'indicator-no-route',
+  [STATE_OFFLINE]: 'indicator-offline',
+  [STATE_ERROR]: 'indicator-error',
+  [STATE_NOT_REGISTERED]: 'indicator-not-registered',
+};
 const SUBTITLE_PREFIX_ORG = 'Org: ';
 const SUBTITLE_PREFIX_PERSONAL = 'Acc: ';
 
@@ -113,22 +125,22 @@ const OFFLINE_ERROR_PATTERNS = ['offline', 'timed out'];
 function getStateAppearance(state) {
   switch (state) {
     case STATE_CONNECTED:
-      return { iconName: ICON_CONNECTED, checked: true, visible: true };
+      return { iconName: ICON_CONNECTED, checked: true, state };
     case STATE_CONNECTING:
-      return { iconName: ICON_CONNECTING, checked: true, visible: true };
+      return { iconName: ICON_CONNECTING, checked: true, state };
     case STATE_DISCONNECTED:
-      return { iconName: ICON_DISCONNECTED, checked: false, visible: true };
+      return { iconName: ICON_DISCONNECTED, checked: false, state };
     case STATE_DISABLED:
-      return { iconName: ICON_DISABLED, checked: false, visible: true };
+      return { iconName: ICON_DISABLED, checked: false, state };
     case STATE_NO_ROUTE:
-      return { iconName: ICON_NO_ROUTE, checked: false, visible: true };
+      return { iconName: ICON_NO_ROUTE, checked: false, state };
     case STATE_OFFLINE:
-      return { iconName: ICON_OFFLINE, checked: false, visible: true };
+      return { iconName: ICON_OFFLINE, checked: false, state };
     case STATE_NOT_REGISTERED:
-      return { iconName: ICON_NO_ROUTE, checked: false, visible: true };
+      return { iconName: ICON_NO_ROUTE, checked: false, state };
     case STATE_ERROR:
     default:
-      return { iconName: ICON_ERROR, checked: false, visible: true };
+      return { iconName: ICON_ERROR, checked: false, state: STATE_ERROR };
   }
 }
 
@@ -390,7 +402,7 @@ const WarpToggle = GObject.registerClass(
         const iconName = ANIMATION_FRAMES[this._animationFrameIndex];
         this.iconName = iconName;
         if (this._onStateChange) {
-          this._onStateChange({ iconName, visible: true });
+          this._onStateChange({ iconName, state: STATE_CONNECTING });
         }
         this._animationFrameIndex =
           (this._animationFrameIndex + 1) % ANIMATION_FRAMES.length;
@@ -424,7 +436,6 @@ const WarpToggle = GObject.registerClass(
         this.iconName = appearance.iconName;
       }
       this.checked = appearance.checked;
-      this.visible = appearance.visible;
       // QuickToggle is a Clutter actor; `reactive` controls whether it accepts pointer input.
       this.reactive = state !== STATE_DISABLED;
       this._notRegistered = state === STATE_NOT_REGISTERED;
@@ -529,28 +540,42 @@ const WarpIndicator = GObject.registerClass(
       this._indicator = this._addIndicator();
       this._indicator.visible = settings.get_boolean('show-indicator');
 
-      // Re-apply the preference whenever it changes in prefs.
-      this._settingsChangedId = settings.connect(
-        'changed::show-indicator',
-        () => {
-          this._indicator.visible =
-            this._settings.get_boolean('show-indicator');
-        },
-      );
+      this._indicatorSettingsIds = [];
+
+      // Re-apply visibility whenever the main or any per-state toggle changes.
+      const indicatorKeys = [
+        'show-indicator',
+        ...Object.values(STATE_INDICATOR_KEY),
+      ];
+      for (const key of indicatorKeys) {
+        const id = settings.connect(`changed::${key}`, () => {
+          this._updateIndicatorVisibility(this._toggle?._state);
+        });
+        this._indicatorSettingsIds.push(id);
+      }
 
       // Create the toggle button and sync indicator appearance with its state.
       this._toggle = new WarpToggle(cliAvailable, settings, (appearance) => {
         this._indicator.iconName = appearance.iconName;
-        // Only show/hide the indicator based on state when the preference allows it.
-        if (this._settings.get_boolean('show-indicator')) {
-          this._indicator.visible = appearance.visible;
-        }
+        this._updateIndicatorVisibility(appearance.state);
       });
       this.quickSettingsItems.push(this._toggle);
     }
 
+    _updateIndicatorVisibility(state) {
+      if (!this._settings.get_boolean('show-indicator')) {
+        this._indicator.visible = false;
+        return;
+      }
+      const key = STATE_INDICATOR_KEY[state];
+      this._indicator.visible = key ? this._settings.get_boolean(key) : true;
+    }
+
     destroy() {
-      this._settings.disconnect(this._settingsChangedId);
+      for (const id of this._indicatorSettingsIds) {
+        this._settings.disconnect(id);
+      }
+      this._indicatorSettingsIds = [];
       this.quickSettingsItems.forEach((item) => item.destroy());
       super.destroy();
     }

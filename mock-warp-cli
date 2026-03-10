@@ -5,12 +5,14 @@
 #   /tmp/mock-warp-cli-state          — one word: connected|disconnected|connecting|
 #                                        disabled|no_route|offline|error|not_registered
 #   /tmp/mock-warp-cli-registration   — one line: org:<name>  |  email:<addr>  |  (empty)
+#   /tmp/mock-warp-cli-delay          — transition delay in seconds (default: 12)
 #
 # Usage (control — you run these to set state):
 #   mock-warp-cli set-state <state>
 #   mock-warp-cli set-org   "<Org Name>"
 #   mock-warp-cli set-personal "<email@example.com>"
 #   mock-warp-cli clear-registration
+#   mock-warp-cli set-delay <seconds>
 #   mock-warp-cli show
 #
 # Usage (extension-facing — the extension calls these automatically):
@@ -22,6 +24,8 @@
 
 STATE_FILE="/tmp/mock-warp-cli-state"
 REG_FILE="/tmp/mock-warp-cli-registration"
+DELAY_FILE="/tmp/mock-warp-cli-delay"
+DEFAULT_DELAY=12
 
 _read_state() {
   if [[ -f "$STATE_FILE" ]]; then
@@ -36,6 +40,14 @@ _read_reg() {
     cat "$REG_FILE"
   else
     echo ""
+  fi
+}
+
+_read_delay() {
+  if [[ -f "$DELAY_FILE" ]]; then
+    cat "$DELAY_FILE"
+  else
+    echo "$DEFAULT_DELAY"
   fi
 }
 
@@ -77,8 +89,19 @@ cmd_clear_registration() {
   echo "Registration cleared"
 }
 
+cmd_set_delay() {
+  local delay="$1"
+  if [[ ! "$delay" =~ ^[0-9]+$ ]]; then
+    echo "Delay must be a non-negative integer (seconds)." >&2
+    exit 1
+  fi
+  echo "$delay" > "$DELAY_FILE"
+  echo "Transition delay set to: ${delay}s"
+}
+
 cmd_show() {
   echo "State:        $(_read_state)"
+  echo "Delay:        $(_read_delay)s"
   local reg
   reg="$(_read_reg)"
   if [[ -z "$reg" ]]; then
@@ -152,6 +175,12 @@ cmd_connect() {
       exit 1
       ;;
     *)
+      _write_state "connecting"
+      local delay
+      delay="$(_read_delay)"
+      if [[ "$delay" -gt 0 ]]; then
+        sleep "$delay"
+      fi
       _write_state "connected"
       echo "Success"
       ;;
@@ -183,6 +212,11 @@ cmd_disconnect() {
       exit 1
       ;;
     *)
+      local delay
+      delay="$(_read_delay)"
+      if [[ "$delay" -gt 0 ]]; then
+        sleep "$delay"
+      fi
       _write_state "disconnected"
       echo "Success"
       ;;
@@ -237,6 +271,7 @@ case "$1" in
   set-org)             cmd_set_org "$2" ;;
   set-personal)        cmd_set_personal "$2" ;;
   clear-registration)  cmd_clear_registration ;;
+  set-delay)           cmd_set_delay "$2" ;;
   show)                cmd_show ;;
 
   # Extension-facing commands
@@ -263,7 +298,8 @@ case "$1" in
     echo "  set-org <name>           Set Teams org registration"
     echo "  set-personal <email>     Set personal account registration"
     echo "  clear-registration       Remove registration info"
-    echo "  show                     Print current state and registration"
+    echo "  set-delay <seconds>      Set transition delay (default: ${DEFAULT_DELAY}s)"
+    echo "  show                     Print current state, delay, and registration"
     echo ""
     echo "Extension-facing commands (called automatically by the extension):"
     echo "  status"

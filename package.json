@@ -24,6 +24,8 @@
     "mock:org": "./mock-warp-cli set-org",
     "mock:personal": "./mock-warp-cli set-personal",
     "mock:clear-reg": "./mock-warp-cli clear-registration",
+    "mock:delay": "./mock-warp-cli set-delay",
+    "mock:no-delay": "./mock-warp-cli set-delay 0",
     "prepare": "husky"
   },
   "dependencies": {

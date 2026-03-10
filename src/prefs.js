@@ -29,18 +29,45 @@ export default class WARPPreferences extends ExtensionPreferences {
   fillPreferencesWindow(window) {
     const settings = this.getSettings();
 
-    // --- General page ---
-    const generalPage = new Adw.PreferencesPage({
-      title: _('General'),
-      iconName: 'preferences-system-symbolic',
+    // =====================================================================
+    // Appearance page
+    // =====================================================================
+    const appearancePage = new Adw.PreferencesPage({
+      title: _('Appearance'),
+      iconName: 'preferences-desktop-appearance-symbolic',
     });
-    window.add(generalPage);
+    window.add(appearancePage);
 
-    // Indicator group
+    // --- Account details group ---
+    const accountGroup = new Adw.PreferencesGroup({
+      title: _('Account Details'),
+    });
+    appearancePage.add(accountGroup);
+
+    const accountDetailsRow = new Adw.SwitchRow({
+      title: _('Show account details'),
+      subtitle: _(
+        'Display the registered account or organisation name in the toggle subtitle',
+      ),
+      active: settings.get_boolean('show-account-details'),
+    });
+    accountGroup.add(accountDetailsRow);
+
+    settings.bind(
+      'show-account-details',
+      accountDetailsRow,
+      'active',
+      Gio.SettingsBindFlags.DEFAULT,
+    );
+
+    // --- Indicator group ---
     const indicatorGroup = new Adw.PreferencesGroup({
       title: _('Indicator'),
+      description: _(
+        'Control whether a status icon appears in the top bar for each connection state',
+      ),
     });
-    generalPage.add(indicatorGroup);
+    appearancePage.add(indicatorGroup);
 
     const indicatorRow = new Adw.SwitchRow({
       title: _('Show status indicator'),
@@ -58,7 +85,7 @@ export default class WARPPreferences extends ExtensionPreferences {
       Gio.SettingsBindFlags.DEFAULT,
     );
 
-    // Per-state indicator toggles
+    // Per-state indicator toggles inside an expander row
     const stateIndicators = [
       { key: 'indicator-connected', title: _('Connected') },
       { key: 'indicator-connecting', title: _('Connecting') },
@@ -70,50 +97,80 @@ export default class WARPPreferences extends ExtensionPreferences {
       { key: 'indicator-not-registered', title: _('Not registered') },
     ];
 
+    const stateExpanderRow = new Adw.ExpanderRow({
+      title: _('Per-state visibility'),
+      subtitle: _('Choose which connection states show the indicator'),
+      sensitive: settings.get_boolean('show-indicator'),
+    });
+    indicatorGroup.add(stateExpanderRow);
+
+    settings.bind(
+      'show-indicator',
+      stateExpanderRow,
+      'sensitive',
+      Gio.SettingsBindFlags.GET,
+    );
+
     for (const { key, title } of stateIndicators) {
       const row = new Adw.SwitchRow({
         title,
         active: settings.get_boolean(key),
-        sensitive: settings.get_boolean('show-indicator'),
       });
-      indicatorGroup.add(row);
+      stateExpanderRow.add_row(row);
 
       settings.bind(key, row, 'active', Gio.SettingsBindFlags.DEFAULT);
-      settings.bind(
-        'show-indicator',
-        row,
-        'sensitive',
-        Gio.SettingsBindFlags.GET,
-      );
     }
 
-    // Appearance group
-    const appearanceGroup = new Adw.PreferencesGroup({
-      title: _('Appearance'),
+    // =====================================================================
+    // Behaviour page
+    // =====================================================================
+    const behaviourPage = new Adw.PreferencesPage({
+      title: _('Behaviour'),
+      iconName: 'preferences-system-symbolic',
     });
-    generalPage.add(appearanceGroup);
+    window.add(behaviourPage);
 
-    const accountDetailsRow = new Adw.SwitchRow({
-      title: _('Show account details'),
+    // --- Polling group ---
+    const pollingGroup = new Adw.PreferencesGroup({
+      title: _('Status Polling'),
+    });
+    behaviourPage.add(pollingGroup);
+
+    const pollIntervalRow = new Adw.SpinRow({
+      title: _('Polling interval'),
       subtitle: _(
-        'Display the registered account or organisation name in the toggle subtitle',
+        'How often the extension checks the WARP connection status (seconds)',
       ),
-      active: settings.get_boolean('show-account-details'),
+      adjustment: new Gtk.Adjustment({
+        value: settings.get_int('poll-interval'),
+        lower: 1,
+        upper: 3600,
+        step_increment: 1,
+        page_increment: 10,
+      }),
     });
-    appearanceGroup.add(accountDetailsRow);
+    pollingGroup.add(pollIntervalRow);
 
+    // Use one-way GET bind (settings → widget) to avoid the bidirectional
+    // bind writing back an uninitialised double value when GSettings fires
+    // a changed notification (e.g. triggered by the extension restarting
+    // its polling timer).  The widget → settings direction is handled
+    // explicitly via notify::value.
     settings.bind(
-      'show-account-details',
-      accountDetailsRow,
-      'active',
-      Gio.SettingsBindFlags.DEFAULT,
+      'poll-interval',
+      pollIntervalRow,
+      'value',
+      Gio.SettingsBindFlags.GET,
     );
+    pollIntervalRow.connect('notify::value', () => {
+      settings.set_int('poll-interval', pollIntervalRow.value);
+    });
 
-    // warp-cli group
+    // --- warp-cli group ---
     const warpCliGroup = new Adw.PreferencesGroup({
       title: _('warp-cli'),
     });
-    generalPage.add(warpCliGroup);
+    behaviourPage.add(warpCliGroup);
 
     const useCustomCliRow = new Adw.SwitchRow({
       title: _('Use custom warp-cli path'),
@@ -150,41 +207,5 @@ export default class WARPPreferences extends ExtensionPreferences {
       'sensitive',
       Gio.SettingsBindFlags.GET,
     );
-
-    // Behaviour group
-    const behaviourGroup = new Adw.PreferencesGroup({
-      title: _('Behaviour'),
-    });
-    generalPage.add(behaviourGroup);
-
-    const pollIntervalRow = new Adw.SpinRow({
-      title: _('Polling interval'),
-      subtitle: _(
-        'How often the extension checks the WARP connection status (seconds)',
-      ),
-      adjustment: new Gtk.Adjustment({
-        value: settings.get_int('poll-interval'),
-        lower: 1,
-        upper: 3600,
-        step_increment: 1,
-        page_increment: 10,
-      }),
-    });
-    behaviourGroup.add(pollIntervalRow);
-
-    // Use one-way GET bind (settings → widget) to avoid the bidirectional
-    // bind writing back an uninitialised double value when GSettings fires
-    // a changed notification (e.g. triggered by the extension restarting
-    // its polling timer).  The widget → settings direction is handled
-    // explicitly via notify::value.
-    settings.bind(
-      'poll-interval',
-      pollIntervalRow,
-      'value',
-      Gio.SettingsBindFlags.GET,
-    );
-    pollIntervalRow.connect('notify::value', () => {
-      settings.set_int('poll-interval', pollIntervalRow.value);
-    });
   }
 }

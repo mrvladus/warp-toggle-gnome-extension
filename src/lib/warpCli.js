@@ -13,6 +13,24 @@ const COMMAND_STATUS = 'status';
 const COMMAND_REGISTRATION_ORG = 'registration organization';
 const COMMAND_REGISTRATION_SHOW = 'registration show';
 
+const REGISTRATION_INFO_PATTERNS = [
+  {
+    type: 'organization',
+    detailType: 'organization',
+    pattern: /^organization:\s*(.+)/im,
+  },
+  {
+    type: 'personal',
+    detailType: 'email',
+    pattern: /^email:\s*(.+)/im,
+  },
+  {
+    type: 'personal',
+    detailType: 'account',
+    pattern: /^account name:\s*(.+)/im,
+  },
+];
+
 // status strings used for parsing
 const STATUS_CONNECTED = 'connected';
 const STATUS_CONNECTING = 'connecting';
@@ -81,22 +99,46 @@ export async function runCommand(cmd, warpCli = WARP_CLI_DEFAULT) {
   });
 }
 
+export function isRegistrationMissingError(message) {
+  const normalizedMessage = `${message}`.toLowerCase();
+  return (
+    normalizedMessage.includes('not registered') ||
+    normalizedMessage.includes('registration missing')
+  );
+}
+
+export function parseRegistrationInfo(info) {
+  for (const registrationInfo of REGISTRATION_INFO_PATTERNS) {
+    const match = info.match(registrationInfo.pattern);
+    if (match) {
+      return {
+        type: registrationInfo.type,
+        detailType: registrationInfo.detailType,
+        detail: match[1].trim(),
+      };
+    }
+  }
+
+  return {
+    type: 'personal',
+    detailType: null,
+    detail: null,
+  };
+}
+
 // Fetches the VPN provider label via `warp-cli registration organization`
 // (Teams) or `registration show` (personal).
 // Returns a prefixed string: "Org: <name>" or "Acc: <name>",
 // SUBTITLE_NOT_REGISTERED when no account is linked yet, or null when no
 // identifiable info is available.
 export async function getVpnProvider(warpCli) {
-  const isNotRegistered = (msg) =>
-    msg.includes('not registered') || msg.includes('registration missing');
-
   try {
     const org = await runCommand(COMMAND_REGISTRATION_ORG, warpCli);
     if (org) {
       return SUBTITLE_PREFIX_ORG + org;
     }
   } catch (err) {
-    if (isNotRegistered(`${err}`.toLowerCase())) {
+    if (isRegistrationMissingError(err)) {
       return SUBTITLE_NOT_REGISTERED;
     }
     // Not a Teams account — fall through to registration show
@@ -104,23 +146,17 @@ export async function getVpnProvider(warpCli) {
 
   try {
     const info = await runCommand(COMMAND_REGISTRATION_SHOW, warpCli);
-    const orgMatch = info.match(/^organization:\s*(.+)/im);
-    if (orgMatch) {
-      return SUBTITLE_PREFIX_ORG + orgMatch[1].trim();
+    const registrationInfo = parseRegistrationInfo(info);
+    if (registrationInfo.type === 'organization' && registrationInfo.detail) {
+      return SUBTITLE_PREFIX_ORG + registrationInfo.detail;
     }
-    // Try personal account identifiers
-    const emailMatch = info.match(/^email:\s*(.+)/im);
-    if (emailMatch) {
-      return SUBTITLE_PREFIX_PERSONAL + emailMatch[1].trim();
-    }
-    const accountMatch = info.match(/^account name:\s*(.+)/im);
-    if (accountMatch) {
-      return SUBTITLE_PREFIX_PERSONAL + accountMatch[1].trim();
+    if (registrationInfo.detail) {
+      return SUBTITLE_PREFIX_PERSONAL + registrationInfo.detail;
     }
     // Personal account but no identifiable info
     return null;
   } catch (err) {
-    if (isNotRegistered(`${err}`.toLowerCase())) {
+    if (isRegistrationMissingError(err)) {
       return SUBTITLE_NOT_REGISTERED;
     }
     return null;

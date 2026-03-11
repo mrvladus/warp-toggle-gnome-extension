@@ -5,7 +5,12 @@ import Gtk from 'gi://Gtk';
 import { gettext as _ } from 'resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js';
 
 import { Settings } from '../lib/constants.js';
-import { getWarpCli, runCommand } from '../lib/warpCli.js';
+import {
+  getWarpCli,
+  isRegistrationMissingError,
+  parseRegistrationInfo,
+  runCommand,
+} from '../lib/warpCli.js';
 
 const COMMAND_VERSION = '--version';
 const COMMAND_REGISTRATION_SHOW = 'registration show';
@@ -175,36 +180,29 @@ export function buildWarpCliPage(settings) {
       const regOutput = await runCommand(COMMAND_REGISTRATION_SHOW, warpCli);
       rawOutputLabel.label = regOutput || CLI_INFO_UNAVAILABLE;
 
-      // Parse account type and detail
-      const orgMatch = regOutput.match(/^organization:\s*(.+)/im);
-      const emailMatch = regOutput.match(/^email:\s*(.+)/im);
-      const accountMatch = regOutput.match(/^account name:\s*(.+)/im);
+      const registrationInfo = parseRegistrationInfo(regOutput);
 
-      if (orgMatch) {
+      if (registrationInfo.type === 'organization' && registrationInfo.detail) {
         accountTypeRow.subtitle = _('Organization');
         accountDetailRow.title = _('Organization');
-        accountDetailRow.subtitle = orgMatch[1].trim();
+        accountDetailRow.subtitle = registrationInfo.detail;
         accountDetailRow.visible = true;
-      } else if (emailMatch) {
+      } else if (registrationInfo.detailType === 'email') {
         accountTypeRow.subtitle = _('Personal');
         accountDetailRow.title = _('Email');
-        accountDetailRow.subtitle = emailMatch[1].trim();
+        accountDetailRow.subtitle = registrationInfo.detail;
         accountDetailRow.visible = true;
-      } else if (accountMatch) {
+      } else if (registrationInfo.detailType === 'account') {
         accountTypeRow.subtitle = _('Personal');
         accountDetailRow.title = _('Account');
-        accountDetailRow.subtitle = accountMatch[1].trim();
+        accountDetailRow.subtitle = registrationInfo.detail;
         accountDetailRow.visible = true;
       } else {
         accountTypeRow.subtitle = _('Personal');
         accountDetailRow.visible = false;
       }
     } catch (err) {
-      const errMsg = `${err}`.toLowerCase();
-      if (
-        errMsg.includes('not registered') ||
-        errMsg.includes('registration missing')
-      ) {
+      if (isRegistrationMissingError(err)) {
         accountTypeRow.subtitle = CLI_INFO_NOT_REGISTERED;
         rawOutputLabel.label = CLI_INFO_NOT_REGISTERED;
       } else {

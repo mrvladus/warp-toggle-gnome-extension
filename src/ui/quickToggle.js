@@ -127,6 +127,7 @@ export const WarpToggle = GObject.registerClass(
       // Monitor button state changes
       this.connect('clicked', async () => {
         if (this._notRegistered) {
+          this.checked = false;
           Gio.AppInfo.launch_default_for_uri(URL_SETUP_GUIDE, null);
           return;
         }

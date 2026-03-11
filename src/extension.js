@@ -32,22 +32,23 @@ import {
   SystemIndicator,
 } from 'resource:///org/gnome/shell/ui/quickSettings.js';
 
-import { Settings, IndicatorStates } from './constants.js';
+import { Settings, State, IndicatorStates } from './constants.js';
+import {
+  WARP_CLI_DEFAULT,
+  COMMAND_CONNECT,
+  COMMAND_DISCONNECT,
+  SUBTITLE_NOT_REGISTERED,
+  getWarpCli,
+  runCommand,
+  getVpnProvider,
+  classifyWarpFailure,
+  getWarpState,
+} from './warpCli.js';
 
 const WARP_TITLE = 'WARP';
 const STATUS_CHECK_INTERVAL_SECONDS_DEFAULT = 10;
 
-// states
-const STATE_CONNECTED = 'connected';
-const STATE_CONNECTING = 'connecting';
-const STATE_DISCONNECTED = 'disconnected';
-const STATE_DISABLED = 'disabled';
-const STATE_NO_ROUTE = 'no_route';
-const STATE_OFFLINE = 'offline';
-const STATE_ERROR = 'error';
-const STATE_NOT_REGISTERED = 'not_registered';
-
-// icons and states
+// icons
 const ICON_CONNECTED = 'network-vpn-symbolic';
 const ICON_CONNECTING = 'network-vpn-acquiring-symbolic';
 const ICON_DISCONNECTED = 'network-vpn-disconnected-symbolic';
@@ -56,20 +57,8 @@ const ICON_NO_ROUTE = 'network-vpn-no-route-symbolic';
 const ICON_OFFLINE = 'network-vpn-offline-symbolic';
 const ICON_ERROR = 'network-vpn-error-symbolic';
 
-const STATUS_CONNECTED = 'connected';
-const STATUS_CONNECTING = 'connecting';
-const STATUS_DISCONNECTED = 'disconnected';
-
-// cli location and debug flag
-const WARP_CLI_DEFAULT = GLib.getenv('WARP_CLI') || 'warp-cli';
+// debug flag
 const DEBUG = false; // Boolean(GLib.getenv('WARP_CLI'));
-
-// command parameters
-const COMMAND_STATUS = 'status';
-const COMMAND_CONNECT = 'connect';
-const COMMAND_DISCONNECT = 'disconnect';
-const COMMAND_REGISTRATION_ORG = 'registration organization';
-const COMMAND_REGISTRATION_SHOW = 'registration show';
 
 // registration setup URL
 const URL_SETUP_GUIDE =
@@ -88,201 +77,48 @@ const SUBTITLE_NO_ROUTE = 'No route to host';
 const SUBTITLE_OFFLINE = 'Offline';
 const SUBTITLE_ERROR = 'Unknown error';
 
-const SUBTITLE_NOT_REGISTERED = 'Not registered \u00b7 Click to set up';
-
-// Map each state to its per-state indicator settings key.
-const STATE_INDICATOR_KEY = Object.fromEntries(
-  Object.entries(IndicatorStates).map(([state, { key }]) => [state, key]),
-);
-const SUBTITLE_PREFIX_ORG = 'Org: ';
-const SUBTITLE_PREFIX_PERSONAL = 'Acc: ';
-
 // error strings
 const WARP_CLI_NOT_FOUND = 'warp-cli command not found';
 
-const DISABLED_ERROR_PATTERNS = [
-  'no such file or directory',
-  'failed to execute child process',
-  'unable to connect',
-  'daemon',
-  'service not running',
-];
-
-const NO_ROUTE_ERROR_PATTERNS = [
-  'network is unreachable',
-  'no route to host',
-  'could not resolve host',
-  'name or service not known',
-];
-
-const OFFLINE_ERROR_PATTERNS = ['offline', 'timed out'];
-
 function getStateAppearance(state) {
   switch (state) {
-    case STATE_CONNECTED:
+    case State.CONNECTED:
       return { iconName: ICON_CONNECTED, checked: true, state };
-    case STATE_CONNECTING:
+    case State.CONNECTING:
       return { iconName: ICON_CONNECTING, checked: true, state };
-    case STATE_DISCONNECTED:
+    case State.DISCONNECTED:
       return { iconName: ICON_DISCONNECTED, checked: false, state };
-    case STATE_DISABLED:
+    case State.DISABLED:
       return { iconName: ICON_DISABLED, checked: false, state };
-    case STATE_NO_ROUTE:
+    case State.NO_ROUTE:
       return { iconName: ICON_NO_ROUTE, checked: false, state };
-    case STATE_OFFLINE:
+    case State.OFFLINE:
       return { iconName: ICON_OFFLINE, checked: false, state };
-    case STATE_NOT_REGISTERED:
+    case State.NOT_REGISTERED:
       return { iconName: ICON_NO_ROUTE, checked: false, state };
-    case STATE_ERROR:
+    case State.ERROR:
     default:
-      return { iconName: ICON_ERROR, checked: false, state: STATE_ERROR };
+      return { iconName: ICON_ERROR, checked: false, state: State.ERROR };
   }
 }
 
 function getStateSubtitle(state) {
   switch (state) {
-    case STATE_CONNECTING:
+    case State.CONNECTING:
       return SUBTITLE_CONNECTING;
-    case STATE_DISABLED:
+    case State.DISABLED:
       return SUBTITLE_SERVICE_NOT_RUNNING;
-    case STATE_NO_ROUTE:
+    case State.NO_ROUTE:
       return SUBTITLE_NO_ROUTE;
-    case STATE_OFFLINE:
+    case State.OFFLINE:
       return SUBTITLE_OFFLINE;
-    case STATE_NOT_REGISTERED:
+    case State.NOT_REGISTERED:
       return SUBTITLE_NOT_REGISTERED;
-    case STATE_ERROR:
+    case State.ERROR:
       return SUBTITLE_ERROR;
     default:
       return null;
   }
-}
-
-function getWarpCli(settings) {
-  if (
-    settings &&
-    settings.get_boolean(Settings.USE_CUSTOM_WARP_CLI) &&
-    settings.get_string(Settings.CUSTOM_WARP_CLI_PATH)
-  ) {
-    return settings.get_string(Settings.CUSTOM_WARP_CLI_PATH);
-  }
-  return WARP_CLI_DEFAULT;
-}
-
-// Fetches the VPN provider label via `warp-cli registration organization`
-// (Teams) or `registration show` (personal).
-// Returns a prefixed string: "Organization: <name>" or "Personal: <name>",
-// SUBTITLE_NOT_REGISTERED when no account is linked yet, or null when no
-// identifiable info is available.
-async function getVpnProvider(warpCli) {
-  const isNotRegistered = (msg) =>
-    msg.includes('not registered') || msg.includes('registration missing');
-
-  try {
-    const org = await runCommand(COMMAND_REGISTRATION_ORG, warpCli);
-    if (org) {
-      return SUBTITLE_PREFIX_ORG + org;
-    }
-  } catch (err) {
-    if (isNotRegistered(`${err}`.toLowerCase())) {
-      return SUBTITLE_NOT_REGISTERED;
-    }
-    // Not a Teams account — fall through to registration show
-  }
-
-  try {
-    const info = await runCommand(COMMAND_REGISTRATION_SHOW, warpCli);
-    const orgMatch = info.match(/^organization:\s*(.+)/im);
-    if (orgMatch) {
-      return SUBTITLE_PREFIX_ORG + orgMatch[1].trim();
-    }
-    // Try personal account identifiers
-    const emailMatch = info.match(/^email:\s*(.+)/im);
-    if (emailMatch) {
-      return SUBTITLE_PREFIX_PERSONAL + emailMatch[1].trim();
-    }
-    const accountMatch = info.match(/^account name:\s*(.+)/im);
-    if (accountMatch) {
-      return SUBTITLE_PREFIX_PERSONAL + accountMatch[1].trim();
-    }
-    // Personal account but no identifiable info
-    return null;
-  } catch (err) {
-    if (isNotRegistered(`${err}`.toLowerCase())) {
-      return SUBTITLE_NOT_REGISTERED;
-    }
-    return null;
-  }
-}
-
-function parseWarpStatus(statusOutput) {
-  if (!statusOutput) {
-    return STATE_ERROR;
-  }
-
-  const status = statusOutput.toLowerCase();
-  if (status.includes(STATUS_DISCONNECTED)) {
-    return STATE_DISCONNECTED;
-  }
-  if (status.includes(STATUS_CONNECTING)) {
-    return STATE_CONNECTING;
-  }
-  if (status.includes(STATUS_CONNECTED)) {
-    return STATE_CONNECTED;
-  }
-  if (DISABLED_ERROR_PATTERNS.some((pattern) => status.includes(pattern))) {
-    return STATE_DISABLED;
-  }
-  if (NO_ROUTE_ERROR_PATTERNS.some((pattern) => status.includes(pattern))) {
-    return STATE_NO_ROUTE;
-  }
-  if (OFFLINE_ERROR_PATTERNS.some((pattern) => status.includes(pattern))) {
-    return STATE_OFFLINE;
-  }
-
-  return STATE_ERROR;
-}
-
-function classifyWarpFailure(err) {
-  const message = `${err}`.toLowerCase();
-  if (DISABLED_ERROR_PATTERNS.some((pattern) => message.includes(pattern))) {
-    return STATE_DISABLED;
-  }
-  if (NO_ROUTE_ERROR_PATTERNS.some((pattern) => message.includes(pattern))) {
-    return STATE_NO_ROUTE;
-  }
-  if (OFFLINE_ERROR_PATTERNS.some((pattern) => message.includes(pattern))) {
-    return STATE_OFFLINE;
-  }
-  return STATE_ERROR;
-}
-
-// Executes a shell command and returns its stdout output.
-async function runCommand(cmd, warpCli = WARP_CLI_DEFAULT) {
-  return new Promise((resolve, reject) => {
-    try {
-      const proc = new Gio.Subprocess({
-        argv: [warpCli, ...cmd.split(' ')],
-        flags:
-          Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE,
-      });
-      proc.init(null);
-      proc.communicate_utf8_async(null, null, (proc, res) => {
-        try {
-          let [ok, stdout, stderr] = proc.communicate_utf8_finish(res);
-          if (!ok || proc.get_exit_status() !== 0) {
-            reject(stderr);
-            return;
-          }
-          resolve(stdout ? stdout.trim() : '');
-        } catch (e) {
-          reject(e);
-        }
-      });
-    } catch (e) {
-      reject(e);
-    }
-  });
 }
 
 const WarpToggle = GObject.registerClass(
@@ -306,7 +142,7 @@ const WarpToggle = GObject.registerClass(
       this._animationFrameIndex = 0;
 
       if (!this._cliAvailable) {
-        this._setState(STATE_DISABLED);
+        this._setState(State.DISABLED);
         return;
       }
 
@@ -322,7 +158,7 @@ const WarpToggle = GObject.registerClass(
           .catch(() => {});
       }
 
-      this._setState(STATE_DISCONNECTED);
+      this._setState(State.DISCONNECTED);
       this._updateStatus(); // Initial check
       this._startCheckingStatus(); // Start periodic updates
 
@@ -376,7 +212,7 @@ const WarpToggle = GObject.registerClass(
 
         const command = this.checked ? COMMAND_CONNECT : COMMAND_DISCONNECT;
         this._setState(
-          command === COMMAND_CONNECT ? STATE_CONNECTING : STATE_DISCONNECTED,
+          command === COMMAND_CONNECT ? State.CONNECTING : State.DISCONNECTED,
         );
 
         try {
@@ -397,7 +233,7 @@ const WarpToggle = GObject.registerClass(
         const iconName = ANIMATION_FRAMES[this._animationFrameIndex];
         this.iconName = iconName;
         if (this._onStateChange) {
-          this._onStateChange({ iconName, state: STATE_CONNECTING });
+          this._onStateChange({ iconName, state: State.CONNECTING });
         }
         this._animationFrameIndex =
           (this._animationFrameIndex + 1) % ANIMATION_FRAMES.length;
@@ -427,17 +263,17 @@ const WarpToggle = GObject.registerClass(
       this._stopConnectingAnimation();
       this._state = state;
       const appearance = getStateAppearance(state);
-      if (state !== STATE_CONNECTING) {
+      if (state !== State.CONNECTING) {
         this.iconName = appearance.iconName;
       }
       this.checked = appearance.checked;
       // QuickToggle is a Clutter actor; `reactive` controls whether it accepts pointer input.
-      this.reactive = state !== STATE_DISABLED;
-      this._notRegistered = state === STATE_NOT_REGISTERED;
+      this.reactive = state !== State.DISABLED;
+      this._notRegistered = state === State.NOT_REGISTERED;
       // Error-like states show their own subtitle; normal states restore the provider label.
       this.subtitle = getStateSubtitle(state) ?? this._providerSubtitle;
 
-      if (state === STATE_CONNECTING) {
+      if (state === State.CONNECTING) {
         this._startConnectingAnimation();
       } else if (this._onStateChange) {
         this._onStateChange(appearance);
@@ -453,17 +289,16 @@ const WarpToggle = GObject.registerClass(
 
     async _updateStatus() {
       try {
-        // TODO: not ideal running Promise.all and the vpn provider here all the time
         const showAccount = this._settings
           ? this._settings.get_boolean(Settings.SHOW_ACCOUNT_DETAILS)
           : true;
         const [state, provider] = await Promise.all([
-          this._getWarpState(),
+          getWarpState(this._warpCli),
           showAccount ? getVpnProvider(this._warpCli) : Promise.resolve(null),
         ]);
-        if (provider === SUBTITLE_NOT_REGISTERED && state !== STATE_DISABLED) {
+        if (provider === SUBTITLE_NOT_REGISTERED && state !== State.DISABLED) {
           this._providerSubtitle = null;
-          this._setState(STATE_NOT_REGISTERED);
+          this._setState(State.NOT_REGISTERED);
         } else {
           this._providerSubtitle = provider;
           this._setState(state);
@@ -493,11 +328,6 @@ const WarpToggle = GObject.registerClass(
         GLib.source_remove(this._statusCheckId);
         this._statusCheckId = null;
       }
-    }
-
-    async _getWarpState() {
-      const status = await runCommand(COMMAND_STATUS, this._warpCli);
-      return parseWarpStatus(status);
     }
 
     destroy() {
@@ -540,7 +370,7 @@ const WarpIndicator = GObject.registerClass(
       // Re-apply visibility whenever the main or any per-state toggle changes.
       const indicatorKeys = [
         Settings.SHOW_INDICATOR,
-        ...Object.values(STATE_INDICATOR_KEY),
+        ...Object.values(IndicatorStates).map((s) => s.key),
       ];
       for (const key of indicatorKeys) {
         const id = settings.connect(`changed::${key}`, () => {
@@ -562,8 +392,10 @@ const WarpIndicator = GObject.registerClass(
         this._indicator.visible = false;
         return;
       }
-      const key = STATE_INDICATOR_KEY[state];
-      this._indicator.visible = key ? this._settings.get_boolean(key) : true;
+      const stateInfo = IndicatorStates[state];
+      this._indicator.visible = stateInfo
+        ? this._settings.get_boolean(stateInfo.key)
+        : true;
     }
 
     destroy() {

@@ -30,13 +30,16 @@ export function buildAboutPage(ext) {
     margin_bottom: 24,
   });
 
-  // Extension icon — use Gtk.Picture so it scales to fill the window width
+  // Extension icon — give Gtk.Picture an explicit size so it renders as a hero image
   const iconPath = `${ext.path}/icon.svg`;
   const iconFile = Gio.File.new_for_path(iconPath);
   if (iconFile.query_exists(null)) {
     const iconPicture = new Gtk.Picture({
       file: iconFile,
       content_fit: Gtk.ContentFit.CONTAIN,
+      width_request: 160,
+      height_request: 160,
+      halign: Gtk.Align.CENTER,
       hexpand: true,
       can_shrink: true,
     });
@@ -50,6 +53,15 @@ export function buildAboutPage(ext) {
     halign: Gtk.Align.CENTER,
   });
   headerBox.append(nameLabel);
+
+  const descLabel = new Gtk.Label({
+    label: _(metadata.description),
+    css_classes: ['dim-label'],
+    wrap: true,
+    halign: Gtk.Align.CENTER,
+    justify: Gtk.Justification.CENTER,
+  });
+  headerBox.append(descLabel);
 
   const versionPill = new Gtk.Label({
     label: _(`v${metadata.version}`),
@@ -67,15 +79,6 @@ export function buildAboutPage(ext) {
     .get_style_context()
     .add_provider(css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION);
   headerBox.append(versionPill);
-
-  const descLabel = new Gtk.Label({
-    label: _(metadata.description),
-    css_classes: ['dim-label'],
-    wrap: true,
-    halign: Gtk.Align.CENTER,
-    justify: Gtk.Justification.CENTER,
-  });
-  headerBox.append(descLabel);
 
   headerGroup.add(headerBox);
 

@@ -135,7 +135,7 @@ export function buildWarpCliPage(settings) {
   // Raw output from `warp-cli registration show`
   const rawOutputGroup = new Adw.PreferencesGroup({
     title: _('Registration Details'),
-    description: _('Raw output from warp-cli registration show'),
+    description: _('Details about the registration as reported by warp-cli'),
   });
   page.add(rawOutputGroup);
 

@@ -96,6 +96,26 @@ export default class WARPPreferences extends ExtensionPreferences {
       settings.bind(key, row, 'active', Gio.SettingsBindFlags.DEFAULT);
     }
 
+    // --- Animation group ---
+    const animationGroup = new Adw.PreferencesGroup({
+      title: _('Animation'),
+    });
+    appearancePage.add(animationGroup);
+
+    const animationRow = new Adw.SwitchRow({
+      title: _('Connecting animation'),
+      subtitle: _('Animate the toggle icon while WARP is connecting'),
+      active: settings.get_boolean(Settings.ENABLE_CONNECTING_ANIMATION),
+    });
+    animationGroup.add(animationRow);
+
+    settings.bind(
+      Settings.ENABLE_CONNECTING_ANIMATION,
+      animationRow,
+      'active',
+      Gio.SettingsBindFlags.DEFAULT,
+    );
+
     // =====================================================================
     // Behaviour page
     // =====================================================================

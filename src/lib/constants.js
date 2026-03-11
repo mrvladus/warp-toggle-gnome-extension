@@ -16,6 +16,7 @@ export const Settings = {
   POLL_INTERVAL: 'poll-interval',
   USE_CUSTOM_WARP_CLI: 'use-custom-warp-cli',
   CUSTOM_WARP_CLI_PATH: 'custom-warp-cli-path',
+  ENABLE_CONNECTING_ANIMATION: 'enable-connecting-animation',
 };
 
 // Per-state indicator settings keys and display metadata, keyed by state name.

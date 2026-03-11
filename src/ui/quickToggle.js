@@ -72,6 +72,17 @@ export const WarpToggle = GObject.registerClass(
       this._updateStatus(); // Initial check
       this._startCheckingStatus(); // Start periodic updates
 
+      // Toggle connecting animation on/off when the preference changes.
+      this._animationChangedId = this._settings.connect(
+        `changed::${Settings.ENABLE_CONNECTING_ANIMATION}`,
+        () => {
+          if (this._state === State.CONNECTING) {
+            this._stopConnectingAnimation();
+            this._applyConnectingVisual();
+          }
+        },
+      );
+
       // Restart the polling timer whenever the interval setting changes.
       this._pollIntervalChangedId = this._settings.connect(
         `changed::${Settings.POLL_INTERVAL}`,
@@ -136,6 +147,21 @@ export const WarpToggle = GObject.registerClass(
       });
     }
 
+    _applyConnectingVisual() {
+      if (
+        this._settings &&
+        this._settings.get_boolean(Settings.ENABLE_CONNECTING_ANIMATION)
+      ) {
+        this._startConnectingAnimation();
+      } else {
+        const appearance = getStateAppearance(State.CONNECTING);
+        this.iconName = appearance.iconName;
+        if (this._onStateChange) {
+          this._onStateChange(appearance);
+        }
+      }
+    }
+
     _startConnectingAnimation() {
       if (this._animationTimerId !== null) return;
       this._animationFrameIndex = 0;
@@ -184,7 +210,7 @@ export const WarpToggle = GObject.registerClass(
       this.subtitle = getStateSubtitle(state) ?? this._providerSubtitle;
 
       if (state === State.CONNECTING) {
-        this._startConnectingAnimation();
+        this._applyConnectingVisual();
       } else if (this._onStateChange) {
         this._onStateChange(appearance);
       }
@@ -243,6 +269,10 @@ export const WarpToggle = GObject.registerClass(
     destroy() {
       this._stopConnectingAnimation();
       this._stopCheckingStatus();
+      if (this._animationChangedId) {
+        this._settings.disconnect(this._animationChangedId);
+        this._animationChangedId = null;
+      }
       if (this._pollIntervalChangedId) {
         this._settings.disconnect(this._pollIntervalChangedId);
         this._pollIntervalChangedId = null;

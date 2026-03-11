@@ -10,7 +10,6 @@ export const State = {
   NOT_REGISTERED: 'not_registered',
 };
 
-// GSettings key names — single source of truth for both extension.js and prefs.js.
 export const Settings = {
   SHOW_INDICATOR: 'show-indicator',
   SHOW_ACCOUNT_DETAILS: 'show-account-details',
@@ -20,8 +19,6 @@ export const Settings = {
 };
 
 // Per-state indicator settings keys and display metadata, keyed by state name.
-// extension.js uses state keys to look up the GSettings key;
-// prefs.js iterates values for `key` + `title`.
 export const IndicatorStates = {
   connected: { key: 'indicator-connected', title: 'Connected' },
   connecting: { key: 'indicator-connecting', title: 'Connecting' },

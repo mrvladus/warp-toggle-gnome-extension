@@ -16,6 +16,7 @@
 #   mock-warp-cli show
 #
 # Usage (extension-facing — the extension calls these automatically):
+#   mock-warp-cli --version
 #   mock-warp-cli status
 #   mock-warp-cli connect
 #   mock-warp-cli disconnect
@@ -275,6 +276,7 @@ case "$1" in
   show)                cmd_show ;;
 
   # Extension-facing commands
+  --version)           echo "mock-warp-cli 2026.1.150.0 (mock)" ;;
   status)              cmd_status ;;
   connect)             cmd_connect ;;
   disconnect)          cmd_disconnect ;;
@@ -302,6 +304,7 @@ case "$1" in
     echo "  show                     Print current state, delay, and registration"
     echo ""
     echo "Extension-facing commands (called automatically by the extension):"
+    echo "  --version"
     echo "  status"
     echo "  connect"
     echo "  disconnect"

@@ -25,6 +25,8 @@ import {
   gettext as _,
 } from 'resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js';
 
+import { Settings, IndicatorStates } from './constants.js';
+
 export default class WARPPreferences extends ExtensionPreferences {
   fillPreferencesWindow(window) {
     const settings = this.getSettings();
@@ -49,12 +51,12 @@ export default class WARPPreferences extends ExtensionPreferences {
       subtitle: _(
         'Display the registered account or organisation name in the toggle subtitle',
       ),
-      active: settings.get_boolean('show-account-details'),
+      active: settings.get_boolean(Settings.SHOW_ACCOUNT_DETAILS),
     });
     accountGroup.add(accountDetailsRow);
 
     settings.bind(
-      'show-account-details',
+      Settings.SHOW_ACCOUNT_DETAILS,
       accountDetailsRow,
       'active',
       Gio.SettingsBindFlags.DEFAULT,
@@ -74,46 +76,36 @@ export default class WARPPreferences extends ExtensionPreferences {
       subtitle: _(
         'Show a status icon in the top bar alongside system indicators',
       ),
-      active: settings.get_boolean('show-indicator'),
+      active: settings.get_boolean(Settings.SHOW_INDICATOR),
     });
     indicatorGroup.add(indicatorRow);
 
     settings.bind(
-      'show-indicator',
+      Settings.SHOW_INDICATOR,
       indicatorRow,
       'active',
       Gio.SettingsBindFlags.DEFAULT,
     );
 
     // Per-state indicator toggles inside an expander row
-    const stateIndicators = [
-      { key: 'indicator-connected', title: _('Connected') },
-      { key: 'indicator-connecting', title: _('Connecting') },
-      { key: 'indicator-disconnected', title: _('Disconnected') },
-      { key: 'indicator-disabled', title: _('Service not running') },
-      { key: 'indicator-no-route', title: _('No route to host') },
-      { key: 'indicator-offline', title: _('Offline') },
-      { key: 'indicator-error', title: _('Error') },
-      { key: 'indicator-not-registered', title: _('Not registered') },
-    ];
 
     const stateExpanderRow = new Adw.ExpanderRow({
       title: _('Per-state visibility'),
       subtitle: _('Choose which connection states show the indicator'),
-      sensitive: settings.get_boolean('show-indicator'),
+      sensitive: settings.get_boolean(Settings.SHOW_INDICATOR),
     });
     indicatorGroup.add(stateExpanderRow);
 
     settings.bind(
-      'show-indicator',
+      Settings.SHOW_INDICATOR,
       stateExpanderRow,
       'sensitive',
       Gio.SettingsBindFlags.GET,
     );
 
-    for (const { key, title } of stateIndicators) {
+    for (const { key, title } of Object.values(IndicatorStates)) {
       const row = new Adw.SwitchRow({
-        title,
+        title: _(title),
         active: settings.get_boolean(key),
       });
       stateExpanderRow.add_row(row);
@@ -142,7 +134,7 @@ export default class WARPPreferences extends ExtensionPreferences {
         'How often the extension checks the WARP connection status (seconds)',
       ),
       adjustment: new Gtk.Adjustment({
-        value: settings.get_int('poll-interval'),
+        value: settings.get_int(Settings.POLL_INTERVAL),
         lower: 1,
         upper: 3600,
         step_increment: 1,
@@ -157,13 +149,13 @@ export default class WARPPreferences extends ExtensionPreferences {
     // its polling timer).  The widget → settings direction is handled
     // explicitly via notify::value.
     settings.bind(
-      'poll-interval',
+      Settings.POLL_INTERVAL,
       pollIntervalRow,
       'value',
       Gio.SettingsBindFlags.GET,
     );
     pollIntervalRow.connect('notify::value', () => {
-      settings.set_int('poll-interval', pollIntervalRow.value);
+      settings.set_int(Settings.POLL_INTERVAL, pollIntervalRow.value);
     });
 
     // --- warp-cli group ---
@@ -175,12 +167,12 @@ export default class WARPPreferences extends ExtensionPreferences {
     const useCustomCliRow = new Adw.SwitchRow({
       title: _('Use custom warp-cli path'),
       subtitle: _('Use a custom executable instead of the default warp-cli'),
-      active: settings.get_boolean('use-custom-warp-cli'),
+      active: settings.get_boolean(Settings.USE_CUSTOM_WARP_CLI),
     });
     warpCliGroup.add(useCustomCliRow);
 
     settings.bind(
-      'use-custom-warp-cli',
+      Settings.USE_CUSTOM_WARP_CLI,
       useCustomCliRow,
       'active',
       Gio.SettingsBindFlags.DEFAULT,
@@ -188,13 +180,13 @@ export default class WARPPreferences extends ExtensionPreferences {
 
     const customCliPathRow = new Adw.EntryRow({
       title: _('Custom warp-cli path'),
-      text: settings.get_string('custom-warp-cli-path'),
-      sensitive: settings.get_boolean('use-custom-warp-cli'),
+      text: settings.get_string(Settings.CUSTOM_WARP_CLI_PATH),
+      sensitive: settings.get_boolean(Settings.USE_CUSTOM_WARP_CLI),
     });
     warpCliGroup.add(customCliPathRow);
 
     settings.bind(
-      'custom-warp-cli-path',
+      Settings.CUSTOM_WARP_CLI_PATH,
       customCliPathRow,
       'text',
       Gio.SettingsBindFlags.DEFAULT,
@@ -202,7 +194,7 @@ export default class WARPPreferences extends ExtensionPreferences {
 
     // Enable/disable the path entry based on the toggle.
     settings.bind(
-      'use-custom-warp-cli',
+      Settings.USE_CUSTOM_WARP_CLI,
       customCliPathRow,
       'sensitive',
       Gio.SettingsBindFlags.GET,

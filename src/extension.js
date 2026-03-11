@@ -32,6 +32,8 @@ import {
   SystemIndicator,
 } from 'resource:///org/gnome/shell/ui/quickSettings.js';
 
+import { Settings, IndicatorStates } from './constants.js';
+
 const WARP_TITLE = 'WARP';
 const STATUS_CHECK_INTERVAL_SECONDS_DEFAULT = 10;
 
@@ -89,16 +91,9 @@ const SUBTITLE_ERROR = 'Unknown error';
 const SUBTITLE_NOT_REGISTERED = 'Not registered \u00b7 Click to set up';
 
 // Map each state to its per-state indicator settings key.
-const STATE_INDICATOR_KEY = {
-  [STATE_CONNECTED]: 'indicator-connected',
-  [STATE_CONNECTING]: 'indicator-connecting',
-  [STATE_DISCONNECTED]: 'indicator-disconnected',
-  [STATE_DISABLED]: 'indicator-disabled',
-  [STATE_NO_ROUTE]: 'indicator-no-route',
-  [STATE_OFFLINE]: 'indicator-offline',
-  [STATE_ERROR]: 'indicator-error',
-  [STATE_NOT_REGISTERED]: 'indicator-not-registered',
-};
+const STATE_INDICATOR_KEY = Object.fromEntries(
+  Object.entries(IndicatorStates).map(([state, { key }]) => [state, key]),
+);
 const SUBTITLE_PREFIX_ORG = 'Org: ';
 const SUBTITLE_PREFIX_PERSONAL = 'Acc: ';
 
@@ -166,10 +161,10 @@ function getStateSubtitle(state) {
 function getWarpCli(settings) {
   if (
     settings &&
-    settings.get_boolean('use-custom-warp-cli') &&
-    settings.get_string('custom-warp-cli-path')
+    settings.get_boolean(Settings.USE_CUSTOM_WARP_CLI) &&
+    settings.get_string(Settings.CUSTOM_WARP_CLI_PATH)
   ) {
-    return settings.get_string('custom-warp-cli-path');
+    return settings.get_string(Settings.CUSTOM_WARP_CLI_PATH);
   }
   return WARP_CLI_DEFAULT;
 }
@@ -316,7 +311,7 @@ const WarpToggle = GObject.registerClass(
       }
 
       // Fetch provider label immediately so it shows before the first status poll
-      if (this._settings.get_boolean('show-account-details')) {
+      if (this._settings.get_boolean(Settings.SHOW_ACCOUNT_DETAILS)) {
         getVpnProvider(this._warpCli)
           .then((p) => {
             this._providerSubtitle = p;
@@ -333,7 +328,7 @@ const WarpToggle = GObject.registerClass(
 
       // Restart the polling timer whenever the interval setting changes.
       this._pollIntervalChangedId = this._settings.connect(
-        'changed::poll-interval',
+        `changed::${Settings.POLL_INTERVAL}`,
         () => {
           this._stopCheckingStatus();
           this._startCheckingStatus();
@@ -342,19 +337,19 @@ const WarpToggle = GObject.registerClass(
 
       // React to warp-cli path changes.
       this._warpCliChangedId = this._settings.connect(
-        'changed::use-custom-warp-cli',
+        `changed::${Settings.USE_CUSTOM_WARP_CLI}`,
         () => this._onWarpCliChanged(),
       );
       this._warpCliPathChangedId = this._settings.connect(
-        'changed::custom-warp-cli-path',
+        `changed::${Settings.CUSTOM_WARP_CLI_PATH}`,
         () => this._onWarpCliChanged(),
       );
 
       // Show or clear account details when the preference toggles.
       this._accountDetailsChangedId = this._settings.connect(
-        'changed::show-account-details',
+        `changed::${Settings.SHOW_ACCOUNT_DETAILS}`,
         () => {
-          if (this._settings.get_boolean('show-account-details')) {
+          if (this._settings.get_boolean(Settings.SHOW_ACCOUNT_DETAILS)) {
             getVpnProvider(this._warpCli)
               .then((p) => {
                 this._providerSubtitle = p;
@@ -460,7 +455,7 @@ const WarpToggle = GObject.registerClass(
       try {
         // TODO: not ideal running Promise.all and the vpn provider here all the time
         const showAccount = this._settings
-          ? this._settings.get_boolean('show-account-details')
+          ? this._settings.get_boolean(Settings.SHOW_ACCOUNT_DETAILS)
           : true;
         const [state, provider] = await Promise.all([
           this._getWarpState(),
@@ -481,7 +476,7 @@ const WarpToggle = GObject.registerClass(
     _startCheckingStatus() {
       if (this._statusCheckId) return; // Prevent duplicate timers
       const interval = this._settings
-        ? this._settings.get_int('poll-interval')
+        ? this._settings.get_int(Settings.POLL_INTERVAL)
         : STATUS_CHECK_INTERVAL_SECONDS_DEFAULT;
       this._statusCheckId = GLib.timeout_add_seconds(
         GLib.PRIORITY_DEFAULT,
@@ -538,13 +533,13 @@ const WarpIndicator = GObject.registerClass(
 
       // Create the indicator icon; honour the show-indicator preference.
       this._indicator = this._addIndicator();
-      this._indicator.visible = settings.get_boolean('show-indicator');
+      this._indicator.visible = settings.get_boolean(Settings.SHOW_INDICATOR);
 
       this._indicatorSettingsIds = [];
 
       // Re-apply visibility whenever the main or any per-state toggle changes.
       const indicatorKeys = [
-        'show-indicator',
+        Settings.SHOW_INDICATOR,
         ...Object.values(STATE_INDICATOR_KEY),
       ];
       for (const key of indicatorKeys) {
@@ -563,7 +558,7 @@ const WarpIndicator = GObject.registerClass(
     }
 
     _updateIndicatorVisibility(state) {
-      if (!this._settings.get_boolean('show-indicator')) {
+      if (!this._settings.get_boolean(Settings.SHOW_INDICATOR)) {
         this._indicator.visible = false;
         return;
       }

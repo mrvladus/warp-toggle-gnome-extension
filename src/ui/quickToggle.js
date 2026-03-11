@@ -9,92 +9,34 @@ import { Settings, State } from '../lib/constants.js';
 import {
   COMMAND_CONNECT,
   COMMAND_DISCONNECT,
-  SUBTITLE_NOT_REGISTERED,
   getWarpCli,
   runCommand,
   getVpnProvider,
   classifyWarpFailure,
   getWarpState,
+  SUBTITLE_NOT_REGISTERED,
 } from '../lib/warpCli.js';
+import {
+  ICON_DEFAULT,
+  WARP_TITLE,
+  ANIMATION_FRAMES,
+  ANIMATION_FRAME_INTERVAL_MS,
+  getStateAppearance,
+  getStateSubtitle,
+} from './stateAppearance.js';
 
 const STATUS_CHECK_INTERVAL_SECONDS_DEFAULT = 10;
-
-// icons
-const ICON_CONNECTED = 'network-vpn-symbolic';
-const ICON_CONNECTING = 'network-vpn-acquiring-symbolic';
-const ICON_DISCONNECTED = 'network-vpn-disconnected-symbolic';
-const ICON_DISABLED = 'network-vpn-disabled-symbolic';
-const ICON_NO_ROUTE = 'network-vpn-no-route-symbolic';
-const ICON_OFFLINE = 'network-vpn-offline-symbolic';
-const ICON_ERROR = 'network-vpn-error-symbolic';
 
 // registration setup URL
 const URL_SETUP_GUIDE =
   'https://developers.cloudflare.com/warp-client/get-started/linux/';
-
-const ANIMATION_FRAMES = Array.from(
-  { length: 14 },
-  (_, i) => `nm-vpn-connecting${String(i + 1).padStart(2, '0')}-symbolic`,
-);
-const ANIMATION_FRAME_INTERVAL_MS = 100;
-
-// subtitles
-const SUBTITLE_CONNECTING = 'Connecting\u2026';
-const SUBTITLE_SERVICE_NOT_RUNNING = 'Service not running';
-const SUBTITLE_NO_ROUTE = 'No route to host';
-const SUBTITLE_OFFLINE = 'Offline';
-const SUBTITLE_ERROR = 'Unknown error';
-
-export const WARP_TITLE = 'WARP';
-export const ICON_DEFAULT = ICON_DISCONNECTED;
-
-function getStateAppearance(state) {
-  switch (state) {
-    case State.CONNECTED:
-      return { iconName: ICON_CONNECTED, checked: true, state };
-    case State.CONNECTING:
-      return { iconName: ICON_CONNECTING, checked: true, state };
-    case State.DISCONNECTED:
-      return { iconName: ICON_DISCONNECTED, checked: false, state };
-    case State.DISABLED:
-      return { iconName: ICON_DISABLED, checked: false, state };
-    case State.NO_ROUTE:
-      return { iconName: ICON_NO_ROUTE, checked: false, state };
-    case State.OFFLINE:
-      return { iconName: ICON_OFFLINE, checked: false, state };
-    case State.NOT_REGISTERED:
-      return { iconName: ICON_NO_ROUTE, checked: false, state };
-    case State.ERROR:
-    default:
-      return { iconName: ICON_ERROR, checked: false, state: State.ERROR };
-  }
-}
-
-function getStateSubtitle(state) {
-  switch (state) {
-    case State.CONNECTING:
-      return SUBTITLE_CONNECTING;
-    case State.DISABLED:
-      return SUBTITLE_SERVICE_NOT_RUNNING;
-    case State.NO_ROUTE:
-      return SUBTITLE_NO_ROUTE;
-    case State.OFFLINE:
-      return SUBTITLE_OFFLINE;
-    case State.NOT_REGISTERED:
-      return SUBTITLE_NOT_REGISTERED;
-    case State.ERROR:
-      return SUBTITLE_ERROR;
-    default:
-      return null;
-  }
-}
 
 export const WarpToggle = GObject.registerClass(
   class WarpToggle extends QuickToggle {
     constructor(cliAvailable, settings, onStateChange) {
       super({
         title: _(WARP_TITLE),
-        iconName: ICON_DISCONNECTED,
+        iconName: ICON_DEFAULT,
         toggleMode: true,
         checked: false,
       });

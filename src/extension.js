@@ -25,7 +25,7 @@ import { Extension } from 'resource:///org/gnome/shell/extensions/extension.js';
 
 import { WARP_CLI_DEFAULT, getWarpCli } from './lib/warpCli.js';
 import { WarpIndicator } from './ui/indicator.js';
-import { WARP_TITLE, ICON_DEFAULT } from './ui/quickToggle.js';
+import { WARP_TITLE, ICON_DEFAULT } from './ui/stateAppearance.js';
 
 const WARP_CLI_NOT_FOUND = 'warp-cli command not found';
 

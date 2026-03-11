@@ -85,11 +85,12 @@ export default class WARPPreferences extends ExtensionPreferences {
       Gio.SettingsBindFlags.GET,
     );
 
-    for (const { key, title } of Object.values(IndicatorStates)) {
+    for (const { key, title, iconName } of Object.values(IndicatorStates)) {
       const row = new Adw.SwitchRow({
         title: _(title),
         active: settings.get_boolean(key),
       });
+      row.add_prefix(new Gtk.Image({ icon_name: iconName, pixel_size: 16 }));
       stateExpanderRow.add_row(row);
 
       settings.bind(key, row, 'active', Gio.SettingsBindFlags.DEFAULT);

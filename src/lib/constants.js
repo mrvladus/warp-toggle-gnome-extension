@@ -20,12 +20,44 @@ export const Settings = {
 
 // Per-state indicator settings keys and display metadata, keyed by state name.
 export const IndicatorStates = {
-  connected: { key: 'indicator-connected', title: 'Connected' },
-  connecting: { key: 'indicator-connecting', title: 'Connecting' },
-  disconnected: { key: 'indicator-disconnected', title: 'Disconnected' },
-  disabled: { key: 'indicator-disabled', title: 'Service not running' },
-  no_route: { key: 'indicator-no-route', title: 'No route to host' },
-  offline: { key: 'indicator-offline', title: 'Offline' },
-  error: { key: 'indicator-error', title: 'Error' },
-  not_registered: { key: 'indicator-not-registered', title: 'Not registered' },
+  connected: {
+    key: 'indicator-connected',
+    title: 'Connected',
+    iconName: 'network-vpn-symbolic',
+  },
+  connecting: {
+    key: 'indicator-connecting',
+    title: 'Connecting',
+    iconName: 'network-vpn-acquiring-symbolic',
+  },
+  disconnected: {
+    key: 'indicator-disconnected',
+    title: 'Disconnected',
+    iconName: 'network-vpn-disconnected-symbolic',
+  },
+  disabled: {
+    key: 'indicator-disabled',
+    title: 'Service not running',
+    iconName: 'network-vpn-disabled-symbolic',
+  },
+  no_route: {
+    key: 'indicator-no-route',
+    title: 'No route to host',
+    iconName: 'network-vpn-no-route-symbolic',
+  },
+  offline: {
+    key: 'indicator-offline',
+    title: 'Offline',
+    iconName: 'network-vpn-offline-symbolic',
+  },
+  error: {
+    key: 'indicator-error',
+    title: 'Error',
+    iconName: 'network-vpn-error-symbolic',
+  },
+  not_registered: {
+    key: 'indicator-not-registered',
+    title: 'Not registered',
+    iconName: 'network-vpn-no-route-symbolic',
+  },
 };

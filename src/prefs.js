@@ -263,7 +263,7 @@ export default class WARPPreferences extends ExtensionPreferences {
     const rawOutputLabel = new Gtk.Label({
       label: CLI_INFO_LOADING,
       selectable: true,
-      wrap: true,
+      wrap: false,
       xalign: 0,
       css_classes: ['monospace', 'dim-label'],
       margin_top: 8,
@@ -271,7 +271,13 @@ export default class WARPPreferences extends ExtensionPreferences {
       margin_start: 12,
       margin_end: 12,
     });
-    rawOutputGroup.add(rawOutputLabel);
+    const rawOutputScroll = new Gtk.ScrolledWindow({
+      hscrollbar_policy: Gtk.PolicyType.AUTOMATIC,
+      vscrollbar_policy: Gtk.PolicyType.NEVER,
+      hexpand: true,
+    });
+    rawOutputScroll.set_child(rawOutputLabel);
+    rawOutputGroup.add(rawOutputScroll);
 
     // Refresh helper — fetches version and registration info
     const refreshCliInfo = async () => {

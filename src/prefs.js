@@ -8,12 +8,19 @@ import {
 } from 'resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js';
 
 import { Settings, IndicatorStates } from './lib/constants.js';
+import { getWarpCli, runCommand } from './lib/warpCli.js';
 
 const AUTHOR = 'mrvladus';
 const LICENSE = 'GPL-3.0';
 const LICENSE_URL = 'https://www.gnu.org/licenses/gpl-3.0.html';
 const REPO_URL = 'https://github.com/mrvladus/warp-toggle-gnome-extension';
 const ISSUES_URL = `${REPO_URL}/issues`;
+
+const COMMAND_VERSION = '--version';
+const COMMAND_REGISTRATION_SHOW = 'registration show';
+const CLI_INFO_LOADING = 'Loading…';
+const CLI_INFO_UNAVAILABLE = 'Unavailable';
+const CLI_INFO_NOT_REGISTERED = 'Not registered';
 
 export default class WARPPreferences extends ExtensionPreferences {
   fillPreferencesWindow(window) {
@@ -123,19 +130,19 @@ export default class WARPPreferences extends ExtensionPreferences {
     );
 
     // =====================================================================
-    // Behaviour page
+    // WARP CLI page
     // =====================================================================
-    const behaviourPage = new Adw.PreferencesPage({
-      title: _('Behaviour'),
-      iconName: 'preferences-system-symbolic',
+    const warpCliPage = new Adw.PreferencesPage({
+      title: _('WARP CLI'),
+      iconName: 'utilities-terminal-symbolic',
     });
-    window.add(behaviourPage);
+    window.add(warpCliPage);
 
     // --- Polling group ---
     const pollingGroup = new Adw.PreferencesGroup({
       title: _('Status Polling'),
     });
-    behaviourPage.add(pollingGroup);
+    warpCliPage.add(pollingGroup);
 
     const pollIntervalRow = new Adw.SpinRow({
       title: _('Polling interval'),
@@ -171,7 +178,7 @@ export default class WARPPreferences extends ExtensionPreferences {
     const warpCliGroup = new Adw.PreferencesGroup({
       title: _('warp-cli'),
     });
-    behaviourPage.add(warpCliGroup);
+    warpCliPage.add(warpCliGroup);
 
     const useCustomCliRow = new Adw.SwitchRow({
       title: _('Use custom warp-cli path'),
@@ -208,6 +215,131 @@ export default class WARPPreferences extends ExtensionPreferences {
       'sensitive',
       Gio.SettingsBindFlags.GET,
     );
+
+    // --- CLI Info group ---
+    const cliInfoGroup = new Adw.PreferencesGroup({
+      title: _('CLI Info'),
+      description: _(
+        'Details from the currently configured warp-cli executable',
+      ),
+    });
+    warpCliPage.add(cliInfoGroup);
+
+    const versionRow = new Adw.ActionRow({
+      title: _('Version'),
+      subtitle: CLI_INFO_LOADING,
+    });
+    versionRow.add_prefix(
+      new Gtk.Image({ icon_name: 'application-x-executable-symbolic' }),
+    );
+    cliInfoGroup.add(versionRow);
+
+    const accountTypeRow = new Adw.ActionRow({
+      title: _('Account Type'),
+      subtitle: CLI_INFO_LOADING,
+    });
+    accountTypeRow.add_prefix(
+      new Gtk.Image({ icon_name: 'avatar-default-symbolic' }),
+    );
+    cliInfoGroup.add(accountTypeRow);
+
+    const accountDetailRow = new Adw.ActionRow({
+      title: _('Account'),
+      subtitle: CLI_INFO_LOADING,
+      visible: false,
+    });
+    accountDetailRow.add_prefix(
+      new Gtk.Image({ icon_name: 'user-info-symbolic' }),
+    );
+    cliInfoGroup.add(accountDetailRow);
+
+    // Raw output from `warp-cli registration show`
+    const rawOutputGroup = new Adw.PreferencesGroup({
+      title: _('Registration Details'),
+      description: _('Raw output from warp-cli registration show'),
+    });
+    warpCliPage.add(rawOutputGroup);
+
+    const rawOutputLabel = new Gtk.Label({
+      label: CLI_INFO_LOADING,
+      selectable: true,
+      wrap: true,
+      xalign: 0,
+      css_classes: ['monospace', 'dim-label'],
+      margin_top: 8,
+      margin_bottom: 8,
+      margin_start: 12,
+      margin_end: 12,
+    });
+    rawOutputGroup.add(rawOutputLabel);
+
+    // Refresh helper — fetches version and registration info
+    const refreshCliInfo = async () => {
+      const warpCli = getWarpCli(settings);
+
+      // Fetch version
+      try {
+        const versionOutput = await runCommand(COMMAND_VERSION, warpCli);
+        versionRow.subtitle = versionOutput || CLI_INFO_UNAVAILABLE;
+      } catch (_e) {
+        versionRow.subtitle = CLI_INFO_UNAVAILABLE;
+      }
+
+      // Fetch registration show
+      try {
+        const regOutput = await runCommand(COMMAND_REGISTRATION_SHOW, warpCli);
+        rawOutputLabel.label = regOutput || CLI_INFO_UNAVAILABLE;
+
+        // Parse account type and detail
+        const orgMatch = regOutput.match(/^organization:\s*(.+)/im);
+        const emailMatch = regOutput.match(/^email:\s*(.+)/im);
+        const accountMatch = regOutput.match(/^account name:\s*(.+)/im);
+
+        if (orgMatch) {
+          accountTypeRow.subtitle = _('Organization');
+          accountDetailRow.title = _('Organization');
+          accountDetailRow.subtitle = orgMatch[1].trim();
+          accountDetailRow.visible = true;
+        } else if (emailMatch) {
+          accountTypeRow.subtitle = _('Personal');
+          accountDetailRow.title = _('Email');
+          accountDetailRow.subtitle = emailMatch[1].trim();
+          accountDetailRow.visible = true;
+        } else if (accountMatch) {
+          accountTypeRow.subtitle = _('Personal');
+          accountDetailRow.title = _('Account');
+          accountDetailRow.subtitle = accountMatch[1].trim();
+          accountDetailRow.visible = true;
+        } else {
+          accountTypeRow.subtitle = _('Personal');
+          accountDetailRow.visible = false;
+        }
+      } catch (err) {
+        const errMsg = `${err}`.toLowerCase();
+        if (
+          errMsg.includes('not registered') ||
+          errMsg.includes('registration missing')
+        ) {
+          accountTypeRow.subtitle = CLI_INFO_NOT_REGISTERED;
+          rawOutputLabel.label = CLI_INFO_NOT_REGISTERED;
+        } else {
+          accountTypeRow.subtitle = CLI_INFO_UNAVAILABLE;
+          rawOutputLabel.label = CLI_INFO_UNAVAILABLE;
+        }
+        accountDetailRow.visible = false;
+      }
+    };
+
+    // Initial fetch
+    refreshCliInfo();
+
+    // Re-fetch when CLI path settings change
+    settings.connect(`changed::${Settings.USE_CUSTOM_WARP_CLI}`, () => {
+      refreshCliInfo();
+    });
+    settings.connect(`changed::${Settings.CUSTOM_WARP_CLI_PATH}`, () => {
+      refreshCliInfo();
+    });
 
     // =====================================================================
     // About page
@@ -255,14 +387,14 @@ export default class WARPPreferences extends ExtensionPreferences {
 
     const versionPill = new Gtk.Label({
       label: _(`v${metadata.version}`),
-      css_classes: ['caption', 'dim-label'],
+      css_classes: ['caption'],
       halign: Gtk.Align.CENTER,
     });
     const provider = versionPill.get_style_context();
     provider.add_class('pill');
     const css = new Gtk.CssProvider();
     css.load_from_data(
-      '.pill { background: alpha(currentColor, 0.1); border-radius: 999px; padding: 4px 14px; }',
+      '.pill { background: alpha(@success_color, 0.15); color: @success_color; border-radius: 999px; padding: 4px 14px; font-weight: bold; }',
       -1,
     );
     versionPill

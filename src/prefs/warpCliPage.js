@@ -102,6 +102,51 @@ export function buildWarpCliPage(settings) {
     Gio.SettingsBindFlags.GET,
   );
 
+  // --- Service group ---
+  const serviceGroup = new Adw.PreferencesGroup({
+    title: _('Systemd Service'),
+    description: _('Control the WARP daemon service managed via systemctl'),
+  });
+  page.add(serviceGroup);
+
+  const useCustomServiceRow = new Adw.SwitchRow({
+    title: _('Use custom service name'),
+    subtitle: _(
+      'Use a custom systemd unit instead of the default warp-svc.service',
+    ),
+    active: settings.get_boolean(Settings.USE_CUSTOM_SERVICE_NAME),
+  });
+  serviceGroup.add(useCustomServiceRow);
+
+  settings.bind(
+    Settings.USE_CUSTOM_SERVICE_NAME,
+    useCustomServiceRow,
+    'active',
+    Gio.SettingsBindFlags.DEFAULT,
+  );
+
+  const serviceNameRow = new Adw.EntryRow({
+    title: _('Custom service name'),
+    text: settings.get_string(Settings.SERVICE_NAME),
+    sensitive: settings.get_boolean(Settings.USE_CUSTOM_SERVICE_NAME),
+  });
+  serviceGroup.add(serviceNameRow);
+
+  settings.bind(
+    Settings.SERVICE_NAME,
+    serviceNameRow,
+    'text',
+    Gio.SettingsBindFlags.DEFAULT,
+  );
+
+  // Enable/disable the service name entry based on the toggle.
+  settings.bind(
+    Settings.USE_CUSTOM_SERVICE_NAME,
+    serviceNameRow,
+    'sensitive',
+    Gio.SettingsBindFlags.GET,
+  );
+
   // --- CLI Info group ---
   const cliInfoGroup = new Adw.PreferencesGroup({
     title: _('CLI Info'),

@@ -208,7 +208,12 @@ export function classifyWarpFailure(err) {
 }
 
 // Runs `warp-cli status` and returns the parsed State.* value.
+// Never throws — classifies CLI failures into a State.* value.
 export async function getWarpState(warpCli) {
-  const status = await runCommand(COMMAND_STATUS, warpCli);
-  return parseWarpStatus(status);
+  try {
+    const status = await runCommand(COMMAND_STATUS, warpCli);
+    return parseWarpStatus(status);
+  } catch (err) {
+    return classifyWarpFailure(err);
+  }
 }

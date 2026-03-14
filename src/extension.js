@@ -24,7 +24,9 @@ import * as MessageTray from 'resource:///org/gnome/shell/ui/messageTray.js';
 import { Extension } from 'resource:///org/gnome/shell/extensions/extension.js';
 
 import { WARP_CLI_DEFAULT, getWarpCli } from './lib/warpCli.js';
+import { WarpStateManager } from './lib/stateManager.js';
 import { WarpIndicator } from './ui/indicator.js';
+import { WarpToggle } from './ui/quickToggle.js';
 import { WARP_TITLE, ICON_DEFAULT } from './ui/stateAppearance.js';
 
 const WARP_CLI_NOT_FOUND = 'warp-cli command not found';
@@ -64,8 +66,16 @@ export default class WARPExtension extends Extension {
       );
     }
 
-    // Add the indicator to the system panel
-    this._indicator = new WarpIndicator(cliAvailable, this._settings);
+    // Central state manager — owns state, polling, and commands.
+    this._stateManager = new WarpStateManager(this._settings, cliAvailable);
+
+    // UI components — both subscribe to the state manager independently.
+    this._toggle = new WarpToggle(this._stateManager, this._settings, this);
+    this._indicator = new WarpIndicator(
+      this._stateManager,
+      this._toggle,
+      this._settings,
+    );
     Main.panel.statusArea.quickSettings.addExternalIndicator(this._indicator);
   }
 
@@ -73,6 +83,11 @@ export default class WARPExtension extends Extension {
     if (this._indicator) {
       this._indicator.destroy();
       this._indicator = null;
+    }
+    this._toggle = null;
+    if (this._stateManager) {
+      this._stateManager.destroy();
+      this._stateManager = null;
     }
   }
 }

@@ -93,8 +93,10 @@ export function buildAppearancePage(settings) {
   page.add(animationGroup);
 
   const animationRow = new Adw.SwitchRow({
-    title: _('Connecting animation'),
-    subtitle: _('Animate the toggle icon while WARP is connecting'),
+    title: _('Toggle animation'),
+    subtitle: _(
+      'Animate the toggle icon during connecting and service operations',
+    ),
     active: settings.get_boolean(Settings.ENABLE_CONNECTING_ANIMATION),
   });
   animationGroup.add(animationRow);

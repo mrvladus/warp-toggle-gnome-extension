@@ -4,5 +4,6 @@
   "uuid": "warptoggle@mrvladus.github.io",
   "url": "https://github.com/mrvladus/warp-toggle-gnome-extension",
   "version": 8,
-  "shell-version": ["45", "46", "47", "48", "49", "50"]
+  "shell-version": ["45", "46", "47", "48", "49", "50"],
+  "settings-schema": "org.gnome.shell.extensions.warptoggle"
 }

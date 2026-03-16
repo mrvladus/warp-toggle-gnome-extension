@@ -7,10 +7,11 @@
     "build:install": "./build install",
     "build:uninstall": "./build uninstall",
     "build:zip": "./build zip",
-    "lint": "eslint extension.js metadata.json",
+    "lint": "eslint src/",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "dev": "./build install && WARP_CLI=$(pwd)/mock-warp-cli dbus-run-session -- gnome-shell --devkit",
+    "prefs": "gnome-extensions prefs warptoggle@mrvladus.github.io",
     "mock:show": "./mock-warp-cli show",
     "mock:connected": "./mock-warp-cli set-state connected",
     "mock:disconnected": "./mock-warp-cli set-state disconnected",
@@ -23,6 +24,8 @@
     "mock:org": "./mock-warp-cli set-org",
     "mock:personal": "./mock-warp-cli set-personal",
     "mock:clear-reg": "./mock-warp-cli clear-registration",
+    "mock:delay": "./mock-warp-cli set-delay",
+    "mock:no-delay": "./mock-warp-cli set-delay 0",
     "prepare": "husky"
   },
   "dependencies": {

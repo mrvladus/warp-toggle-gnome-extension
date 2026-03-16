@@ -2,6 +2,12 @@
 
 #### Toggle Cloudflare WARP connection from Quick Settings menu
 
+<img src="src/icon.svg" alt="WARP Toggle icon" width="128">
+
+### Screenshot
+
+<img src="assets/screenshot.png" alt="Screenshot">
+
 ### Install
 
 #### Prerequisite

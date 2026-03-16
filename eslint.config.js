@@ -2,12 +2,12 @@ import json from '@eslint/json';
 
 export default [
   {
-    files: ['metadata.json'],
+    files: ['src/**/*.json'],
     language: 'json/json',
     ...json.configs.recommended,
   },
   {
-    files: ['extension.js'],
+    files: ['src/**/*.js'],
     languageOptions: {
       ecmaVersion: 'latest',
       sourceType: 'module',

@@ -8,7 +8,7 @@ import { IconAnimator } from './iconAnimator.js';
 
 export const WarpIndicator = GObject.registerClass(
   class WarpIndicator extends SystemIndicator {
-    constructor(stateManager, toggle, settings) {
+    constructor(stateManager, settings, quickItem) {
       super();
 
       this._stateManager = stateManager;
@@ -39,7 +39,13 @@ export const WarpIndicator = GObject.registerClass(
         (_mgr, state) => this._onStateChanged(state),
       );
 
-      this.quickSettingsItems.push(toggle);
+      if (quickItem) {
+        this.quickSettingsItems.push(quickItem);
+      }
+
+      if (this._stateManager.state !== null) {
+        this._onStateChanged(this._stateManager.state);
+      }
     }
 
     _onStateChanged(state) {

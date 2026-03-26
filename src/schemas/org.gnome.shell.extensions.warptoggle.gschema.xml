@@ -57,6 +57,16 @@
       <summary>Show account details</summary>
       <description>Fetch and display the registered account or organisation name in the toggle subtitle.</description>
     </key>
+    <key name="enable-quick-settings-dropdown" type="b">
+      <default>true</default>
+      <summary>Enable quick settings dropdown</summary>
+      <description>Whether the quick settings tile should show its dropdown menu with service controls.</description>
+    </key>
+    <key name="show-quick-settings-settings-button" type="b">
+      <default>true</default>
+      <summary>Show dropdown settings button</summary>
+      <description>Whether the quick settings dropdown should include a shortcut button that opens the extension preferences.</description>
+    </key>
     <key name="use-custom-warp-cli" type="b">
       <default>false</default>
       <summary>Use custom warp-cli path</summary>

@@ -23,10 +23,11 @@ import * as MessageTray from 'resource:///org/gnome/shell/ui/messageTray.js';
 
 import { Extension } from 'resource:///org/gnome/shell/extensions/extension.js';
 
+import { Settings } from './lib/constants.js';
 import { WARP_CLI_DEFAULT, getWarpCli } from './lib/warpCli.js';
 import { WarpStateManager } from './lib/stateManager.js';
 import { WarpIndicator } from './ui/indicator.js';
-import { WarpToggle } from './ui/quickToggle.js';
+import { WarpMenuToggle, WarpQuickButton } from './ui/quickToggle.js';
 import { WARP_TITLE, ICON_DEFAULT } from './ui/stateAppearance.js';
 
 const WARP_CLI_NOT_FOUND = 'warp-cli command not found';
@@ -69,25 +70,52 @@ export default class WARPExtension extends Extension {
     // Central state manager — owns state, polling, and commands.
     this._stateManager = new WarpStateManager(this._settings, cliAvailable);
 
-    // UI components — both subscribe to the state manager independently.
-    this._toggle = new WarpToggle(this._stateManager, this._settings, this);
+    const quickSettingsKeys = [
+      Settings.ENABLE_QUICK_SETTINGS_DROPDOWN,
+      Settings.SHOW_QUICK_SETTINGS_SETTINGS_BUTTON,
+    ];
+    this._quickSettingsChangedIds = quickSettingsKeys.map((key) =>
+      this._settings.connect(`changed::${key}`, () => this._rebuildIndicator()),
+    );
+
+    this._rebuildIndicator();
+  }
+
+  disable() {
+    this._destroyIndicator();
+    if (this._quickSettingsChangedIds) {
+      for (const id of this._quickSettingsChangedIds) {
+        this._settings.disconnect(id);
+      }
+      this._quickSettingsChangedIds = null;
+    }
+    if (this._stateManager) {
+      this._stateManager.destroy();
+      this._stateManager = null;
+    }
+  }
+
+  _rebuildIndicator() {
+    this._destroyIndicator();
+
+    const quickItem = this._settings.get_boolean(
+      Settings.ENABLE_QUICK_SETTINGS_DROPDOWN,
+    )
+      ? new WarpMenuToggle(this._stateManager, this._settings, this)
+      : new WarpQuickButton(this._stateManager, this._settings);
+
     this._indicator = new WarpIndicator(
       this._stateManager,
-      this._toggle,
       this._settings,
+      quickItem,
     );
     Main.panel.statusArea.quickSettings.addExternalIndicator(this._indicator);
   }
 
-  disable() {
+  _destroyIndicator() {
     if (this._indicator) {
       this._indicator.destroy();
       this._indicator = null;
-    }
-    this._toggle = null;
-    if (this._stateManager) {
-      this._stateManager.destroy();
-      this._stateManager = null;
     }
   }
 }

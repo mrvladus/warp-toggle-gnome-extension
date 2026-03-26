@@ -16,6 +16,8 @@ export const State = {
 export const Settings = {
   SHOW_INDICATOR: 'show-indicator',
   SHOW_ACCOUNT_DETAILS: 'show-account-details',
+  ENABLE_QUICK_SETTINGS_DROPDOWN: 'enable-quick-settings-dropdown',
+  SHOW_QUICK_SETTINGS_SETTINGS_BUTTON: 'show-quick-settings-settings-button',
   POLL_INTERVAL: 'poll-interval',
   USE_CUSTOM_WARP_CLI: 'use-custom-warp-cli',
   CUSTOM_WARP_CLI_PATH: 'custom-warp-cli-path',

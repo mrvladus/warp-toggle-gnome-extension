@@ -62,6 +62,16 @@
       <summary>Enable quick settings dropdown</summary>
       <description>Whether the quick settings tile should show its dropdown menu with service controls.</description>
     </key>
+    <key name="start-service-on-disabled-click" type="b">
+      <default>false</default>
+      <summary>Start service from disabled tile click</summary>
+      <description>Whether clicking the quick settings tile while the WARP service is not running should start the systemd service directly.</description>
+    </key>
+    <key name="show-quick-settings-refresh-button" type="b">
+      <default>true</default>
+      <summary>Show dropdown refresh button</summary>
+      <description>Whether the quick settings dropdown should include a shortcut button that refreshes the WARP status immediately.</description>
+    </key>
     <key name="show-quick-settings-settings-button" type="b">
       <default>true</default>
       <summary>Show dropdown settings button</summary>

@@ -72,6 +72,8 @@ export default class WARPExtension extends Extension {
 
     const quickSettingsKeys = [
       Settings.ENABLE_QUICK_SETTINGS_DROPDOWN,
+      Settings.START_SERVICE_ON_DISABLED_CLICK,
+      Settings.SHOW_QUICK_SETTINGS_REFRESH_BUTTON,
       Settings.SHOW_QUICK_SETTINGS_SETTINGS_BUTTON,
     ];
     this._quickSettingsChangedIds = quickSettingsKeys.map((key) =>

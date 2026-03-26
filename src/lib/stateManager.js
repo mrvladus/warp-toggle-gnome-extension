@@ -32,6 +32,7 @@ export const WarpStateManager = GObject.registerClass(
       this._providerSubtitle = null;
       this._warpCli = getWarpCli(settings);
       this._statusCheckId = null;
+      this._statusRefreshPromise = null;
       this._pendingServiceAction = null;
       this._settingsIds = [];
 
@@ -44,7 +45,7 @@ export const WarpStateManager = GObject.registerClass(
       this._refreshProvider();
 
       this._setState(State.DISCONNECTED);
-      this._updateStatus();
+      this.refreshStatus();
       this._startCheckingStatus();
 
       // Restart the polling timer whenever the interval setting changes.
@@ -85,6 +86,10 @@ export const WarpStateManager = GObject.registerClass(
       return this._providerSubtitle;
     }
 
+    get isRefreshing() {
+      return this._statusRefreshPromise !== null;
+    }
+
     // Emits the state-changed signal unconditionally.
     _notify(state) {
       this.emit('state-changed', state);
@@ -112,7 +117,7 @@ export const WarpStateManager = GObject.registerClass(
         return;
       }
 
-      await this._updateStatus();
+      await this.refreshStatus();
     }
 
     async serviceAction(action) {
@@ -135,13 +140,34 @@ export const WarpStateManager = GObject.registerClass(
         } else {
           // pkexec cancelled — revert to real state.
           this._state = null;
-          await this._updateStatus();
+          await this.refreshStatus();
+        }
+      }
+    }
+
+    async refreshStatus() {
+      if (!this._cliAvailable) {
+        return;
+      }
+
+      if (this._statusRefreshPromise) {
+        return this._statusRefreshPromise;
+      }
+
+      const refreshPromise = this._refreshStatus();
+      this._statusRefreshPromise = refreshPromise;
+
+      try {
+        await refreshPromise;
+      } finally {
+        if (this._statusRefreshPromise === refreshPromise) {
+          this._statusRefreshPromise = null;
         }
       }
     }
 
     // Fetches fresh state and provider info; always notifies subscribers.
-    async _updateStatus() {
+    async _refreshStatus() {
       try {
         const [state, provider] = await Promise.all([
           getWarpState(this._warpCli),
@@ -205,7 +231,7 @@ export const WarpStateManager = GObject.registerClass(
     _onWarpCliChanged() {
       this._warpCli = getWarpCli(this._settings);
       this._stopCheckingStatus();
-      this._updateStatus();
+      this.refreshStatus();
       this._startCheckingStatus();
     }
 
@@ -218,7 +244,7 @@ export const WarpStateManager = GObject.registerClass(
         GLib.PRIORITY_DEFAULT,
         interval,
         () => {
-          this._updateStatus();
+          this.refreshStatus();
           return GLib.SOURCE_CONTINUE;
         },
       );

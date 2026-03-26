@@ -37,6 +37,8 @@ class WarpQuickItemController {
     this._withMenu = withMenu;
     this._animator = new IconAnimator(item);
     this._serviceMenu = null;
+    this._refreshButton = null;
+    this._refreshInProgress = false;
 
     if (this._withMenu) {
       this._buildMenu();
@@ -60,7 +62,12 @@ class WarpQuickItemController {
     this._clickedId = this._item.connect('clicked', () => {
       const state = this._stateManager.state;
       if (isServiceTransitionState(state)) return;
-      if (state === State.DISABLED) return;
+      if (state === State.DISABLED) {
+        if (this._shouldStartServiceOnDisabledClick()) {
+          this._stateManager.serviceAction('start');
+        }
+        return;
+      }
       if (state === State.NOT_REGISTERED) {
         this._item.checked = false;
         Gio.AppInfo.launch_default_for_uri(URL_SETUP_GUIDE, null);
@@ -78,23 +85,50 @@ class WarpQuickItemController {
   _buildMenu() {
     this._item.menu.setHeader(ICON_DEFAULT, _(WARP_TITLE));
 
-    if (
-      this._settings.get_boolean(Settings.SHOW_QUICK_SETTINGS_SETTINGS_BUTTON)
-    ) {
-      const settingsButton = new St.Button({
-        style_class: 'icon-button',
-        child: new St.Icon({ iconName: 'emblem-system-symbolic' }),
+    const showRefreshButton = this._settings.get_boolean(
+      Settings.SHOW_QUICK_SETTINGS_REFRESH_BUTTON,
+    );
+    const showSettingsButton = this._settings.get_boolean(
+      Settings.SHOW_QUICK_SETTINGS_SETTINGS_BUTTON,
+    );
+
+    if (showRefreshButton || showSettingsButton) {
+      const headerButtons = new St.BoxLayout({
+        style: 'spacing: 6px;',
         x_expand: true,
         x_align: Clutter.ActorAlign.END,
       });
-      settingsButton.connect('clicked', () => {
-        this._item.menu.close();
-        if (this._extension) {
-          this._extension.openPreferences();
-        }
-      });
-      this._item.menu.addHeaderSuffix(settingsButton);
+
+      if (showRefreshButton) {
+        this._refreshButton = new St.Button({
+          style_class: 'icon-button',
+          child: new St.Icon({ iconName: 'view-refresh-symbolic' }),
+        });
+        this._refreshButton.connect('clicked', () => {
+          this._handleRefreshClicked();
+        });
+        headerButtons.add_child(this._refreshButton);
+      }
+
+      if (showSettingsButton) {
+        const settingsButton = new St.Button({
+          style_class: 'icon-button',
+          child: new St.Icon({ iconName: 'emblem-system-symbolic' }),
+        });
+        settingsButton.connect('clicked', () => {
+          this._item.menu.close();
+          if (this._extension) {
+            this._extension.openPreferences();
+          }
+        });
+        headerButtons.add_child(settingsButton);
+      }
+
+      this._item.menu.addHeaderSuffix(headerButtons);
       this._item.menu._headerSpacer.x_expand = false;
+      this._syncHeaderButtons(this._stateManager.state);
+    } else {
+      this._refreshButton = null;
     }
 
     this._serviceMenu = new ServiceMenuController(
@@ -110,22 +144,75 @@ class WarpQuickItemController {
     this._item.toggleMode =
       state !== State.DISABLED && !isServiceTransitionState(state);
     this._item.checked = appearance.checked;
-    this._item.subtitle =
-      getStateSubtitle(state) ?? this._stateManager.providerSubtitle;
+    this._item.subtitle = this._getSubtitle(state);
 
     if (this._serviceMenu) {
       this._item.set_reactive(true);
+      this._syncHeaderButtons(state);
       this._serviceMenu.updateState(state);
     } else {
-      this._item.set_reactive(
-        state !== State.DISABLED && !isServiceTransitionState(state),
-      );
+      this._item.set_reactive(this._isMainActionReactive(state));
     }
 
     this._animator.syncToState(
       state,
       this._settings.get_boolean(Settings.ENABLE_CONNECTING_ANIMATION),
     );
+  }
+
+  async _handleRefreshClicked() {
+    if (this._refreshInProgress) {
+      return;
+    }
+
+    const state = this._stateManager.state;
+    if (isServiceTransitionState(state)) {
+      return;
+    }
+
+    this._refreshInProgress = true;
+    this._syncHeaderButtons(state);
+
+    try {
+      await this._stateManager.refreshStatus();
+    } finally {
+      this._refreshInProgress = false;
+      this._syncHeaderButtons(this._stateManager.state);
+    }
+  }
+
+  _syncHeaderButtons(state) {
+    if (!this._refreshButton) {
+      return;
+    }
+
+    const reactive =
+      !this._refreshInProgress && !isServiceTransitionState(state);
+    this._refreshButton.set_reactive(reactive);
+    this._refreshButton.can_focus = reactive;
+    this._refreshButton.track_hover = reactive;
+  }
+
+  _shouldStartServiceOnDisabledClick() {
+    return this._settings.get_boolean(Settings.START_SERVICE_ON_DISABLED_CLICK);
+  }
+
+  _isMainActionReactive(state) {
+    if (isServiceTransitionState(state)) {
+      return false;
+    }
+    if (state === State.DISABLED) {
+      return this._shouldStartServiceOnDisabledClick();
+    }
+    return true;
+  }
+
+  _getSubtitle(state) {
+    if (state === State.DISABLED && this._shouldStartServiceOnDisabledClick()) {
+      return _('Service not running · Click to start service');
+    }
+
+    return getStateSubtitle(state) ?? this._stateManager.providerSubtitle;
   }
 
   destroy() {

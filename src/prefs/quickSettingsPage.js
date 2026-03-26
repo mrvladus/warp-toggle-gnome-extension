@@ -13,9 +13,6 @@ export function buildQuickSettingsPage(settings) {
 
   const group = new Adw.PreferencesGroup({
     title: _('Dropdown'),
-    description: _(
-      'Control whether the quick settings tile shows its service menu',
-    ),
   });
   page.add(group);
 
@@ -33,9 +30,29 @@ export function buildQuickSettingsPage(settings) {
     Gio.SettingsBindFlags.DEFAULT,
   );
 
+  const behaviorGroup = new Adw.PreferencesGroup({
+    title: _('Tile Behavior'),
+  });
+  page.add(behaviorGroup);
+
+  const startServiceOnDisabledClickRow = new Adw.SwitchRow({
+    title: _('Start service when disabled tile is clicked'),
+    subtitle: _(
+      'Make a click on the disabled quick settings tile start the systemd service directly',
+    ),
+    active: settings.get_boolean(Settings.START_SERVICE_ON_DISABLED_CLICK),
+  });
+  behaviorGroup.add(startServiceOnDisabledClickRow);
+
+  settings.bind(
+    Settings.START_SERVICE_ON_DISABLED_CLICK,
+    startServiceOnDisabledClickRow,
+    'active',
+    Gio.SettingsBindFlags.DEFAULT,
+  );
+
   const headerGroup = new Adw.PreferencesGroup({
     title: _('Header Actions'),
-    description: _('Control which shortcuts appear in the dropdown header'),
     sensitive: settings.get_boolean(Settings.ENABLE_QUICK_SETTINGS_DROPDOWN),
   });
   page.add(headerGroup);
@@ -54,7 +71,22 @@ export function buildQuickSettingsPage(settings) {
     ),
     active: settings.get_boolean(Settings.SHOW_QUICK_SETTINGS_SETTINGS_BUTTON),
   });
+  const refreshButtonRow = new Adw.SwitchRow({
+    title: _('Show refresh button'),
+    subtitle: _(
+      'Add a shortcut button in the dropdown header that refreshes the service status immediately',
+    ),
+    active: settings.get_boolean(Settings.SHOW_QUICK_SETTINGS_REFRESH_BUTTON),
+  });
+  headerGroup.add(refreshButtonRow);
   headerGroup.add(settingsButtonRow);
+
+  settings.bind(
+    Settings.SHOW_QUICK_SETTINGS_REFRESH_BUTTON,
+    refreshButtonRow,
+    'active',
+    Gio.SettingsBindFlags.DEFAULT,
+  );
 
   settings.bind(
     Settings.SHOW_QUICK_SETTINGS_SETTINGS_BUTTON,

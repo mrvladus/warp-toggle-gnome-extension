@@ -17,6 +17,8 @@ export const Settings = {
   SHOW_INDICATOR: 'show-indicator',
   SHOW_ACCOUNT_DETAILS: 'show-account-details',
   ENABLE_QUICK_SETTINGS_DROPDOWN: 'enable-quick-settings-dropdown',
+  START_SERVICE_ON_DISABLED_CLICK: 'start-service-on-disabled-click',
+  SHOW_QUICK_SETTINGS_REFRESH_BUTTON: 'show-quick-settings-refresh-button',
   SHOW_QUICK_SETTINGS_SETTINGS_BUTTON: 'show-quick-settings-settings-button',
   POLL_INTERVAL: 'poll-interval',
   USE_CUSTOM_WARP_CLI: 'use-custom-warp-cli',

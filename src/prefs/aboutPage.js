@@ -9,6 +9,12 @@ const LICENSE = 'GPL-3.0';
 const LICENSE_URL = 'https://www.gnu.org/licenses/gpl-3.0.html';
 const REPO_URL = 'https://github.com/mrvladus/warp-toggle-gnome-extension';
 const ISSUES_URL = `${REPO_URL}/issues`;
+const CONTRIBUTORS = [
+  {
+    name: 'petar-v',
+    url: 'https://github.com/petar-v',
+  },
+];
 
 export function buildAboutPage(ext) {
   const page = new Adw.PreferencesPage({
@@ -138,6 +144,29 @@ export function buildAboutPage(ext) {
     Gio.AppInfo.launch_default_for_uri(LICENSE_URL, null);
   });
   creditsGroup.add(licenseRow);
+
+  const contributorsGroup = new Adw.PreferencesGroup({
+    title: _('Contributors'),
+  });
+  page.add(contributorsGroup);
+
+  for (const contributor of CONTRIBUTORS) {
+    const contributorRow = new Adw.ActionRow({
+      title: contributor.name,
+      subtitle: contributor.url,
+      activatable: true,
+    });
+    contributorRow.add_prefix(
+      new Gtk.Image({ icon_name: 'avatar-default-symbolic' }),
+    );
+    contributorRow.add_suffix(
+      new Gtk.Image({ icon_name: 'adw-external-link-symbolic' }),
+    );
+    contributorRow.connect('activated', () => {
+      Gio.AppInfo.launch_default_for_uri(contributor.url, null);
+    });
+    contributorsGroup.add(contributorRow);
+  }
 
   return page;
 }

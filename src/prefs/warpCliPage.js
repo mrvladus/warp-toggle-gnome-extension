@@ -4,7 +4,7 @@ import Gtk from 'gi://Gtk';
 
 import { gettext as _ } from 'resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js';
 
-import { Settings } from '../lib/constants.js';
+import { Settings, ServiceAuthBackend } from '../lib/constants.js';
 import {
   getWarpCli,
   isRegistrationMissingError,
@@ -146,6 +146,43 @@ export function buildWarpCliPage(settings) {
     'sensitive',
     Gio.SettingsBindFlags.GET,
   );
+
+  const authBackendModel = new Gtk.StringList();
+  authBackendModel.append(_('Auto'));
+  authBackendModel.append(_('pkexec'));
+  authBackendModel.append(_('systemd D-Bus'));
+
+  const backendValues = [
+    ServiceAuthBackend.AUTO,
+    ServiceAuthBackend.PKEXEC,
+    ServiceAuthBackend.SYSTEMD_DBUS,
+  ];
+
+  const currentBackend = settings.get_string(Settings.SERVICE_AUTH_BACKEND);
+  const initialIndex = Math.max(0, backendValues.indexOf(currentBackend));
+
+  const authBackendRow = new Adw.ComboRow({
+    title: _('Authentication backend'),
+    subtitle: _('How the extension escalates privileges for service control'),
+    model: authBackendModel,
+    selected: initialIndex,
+  });
+  serviceGroup.add(authBackendRow);
+
+  authBackendRow.connect('notify::selected', () => {
+    const idx = authBackendRow.selected;
+    if (idx >= 0 && idx < backendValues.length) {
+      settings.set_string(Settings.SERVICE_AUTH_BACKEND, backendValues[idx]);
+    }
+  });
+
+  settings.connect(`changed::${Settings.SERVICE_AUTH_BACKEND}`, () => {
+    const val = settings.get_string(Settings.SERVICE_AUTH_BACKEND);
+    const idx = backendValues.indexOf(val);
+    if (idx >= 0 && authBackendRow.selected !== idx) {
+      authBackendRow.selected = idx;
+    }
+  });
 
   // --- CLI Info group ---
   const cliInfoGroup = new Adw.PreferencesGroup({

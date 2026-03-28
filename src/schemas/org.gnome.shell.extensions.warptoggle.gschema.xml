@@ -108,5 +108,10 @@
       <summary>Systemd service name</summary>
       <description>The name of the systemd service unit used to start and stop the WARP daemon.</description>
     </key>
+    <key name="service-auth-backend" type="s">
+      <default>'auto'</default>
+      <summary>Service authentication backend</summary>
+      <description>Which privilege-escalation method to use for service control. 'auto' tries pkexec first, falling back to systemd-dbus. 'pkexec' forces the pkexec backend. 'systemd-dbus' forces the native D-Bus backend.</description>
+    </key>
   </schema>
 </schemalist>

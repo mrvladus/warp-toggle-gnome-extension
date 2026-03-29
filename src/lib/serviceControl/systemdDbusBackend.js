@@ -14,6 +14,27 @@ const SYSTEMD_METHOD_MAP = {
   restart: 'RestartUnit',
 };
 
+// D-Bus / polkit error markers used to classify failures.
+const DBUS_CANCELLED_MARKERS = [
+  'dismissed',
+  'notauthorized',
+  'interactiveauthorizationrequired',
+];
+const DBUS_DENIED_MARKERS = ['accessdenied', 'rejected'];
+
+function messageContainsAny(msg, markers) {
+  const lower = msg.toLowerCase();
+  return markers.some((m) => lower.includes(m));
+}
+
+function isDbusAuthCancelled(msg) {
+  return messageContainsAny(msg, DBUS_CANCELLED_MARKERS);
+}
+
+function isDbusAuthDenied(msg) {
+  return messageContainsAny(msg, DBUS_DENIED_MARKERS);
+}
+
 /**
  * Runs a systemctl action via the systemd D-Bus Manager interface.
  * Uses ALLOW_INTERACTIVE_AUTHORIZATION so polkit can prompt the user.
@@ -58,12 +79,7 @@ export async function runServiceCommandSystemdDbus(action, serviceName) {
   } catch (e) {
     const msg = e.message || String(e);
 
-    // Polkit interactive auth dismissed / not authorized.
-    if (
-      msg.includes('dismissed') ||
-      msg.includes('NotAuthorized') ||
-      msg.includes('InteractiveAuthorizationRequired')
-    ) {
+    if (isDbusAuthCancelled(msg)) {
       throw makeServiceAuthError(
         msg,
         ServiceAuthErrorCode.CANCELLED,
@@ -71,7 +87,7 @@ export async function runServiceCommandSystemdDbus(action, serviceName) {
       );
     }
 
-    if (msg.includes('AccessDenied') || msg.includes('Rejected')) {
+    if (isDbusAuthDenied(msg)) {
       throw makeServiceAuthError(
         msg,
         ServiceAuthErrorCode.DENIED,

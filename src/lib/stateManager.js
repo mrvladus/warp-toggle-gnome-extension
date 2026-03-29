@@ -2,7 +2,7 @@ import GObject from 'gi://GObject';
 import GLib from 'gi://GLib';
 
 import { Settings, State } from './constants.js';
-import { runServiceCommand } from './serviceControl.js';
+import { runServiceCommand } from './serviceControl/index.js';
 import {
   COMMAND_CONNECT,
   COMMAND_DISCONNECT,

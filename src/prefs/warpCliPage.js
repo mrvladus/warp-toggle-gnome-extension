@@ -6,14 +6,14 @@ import { gettext as _ } from 'resource:///org/gnome/Shell/Extensions/js/extensio
 
 import { Settings, ServiceAuthBackend } from '../lib/constants.js';
 import {
+  COMMAND_REGISTRATION_SHOW,
   getWarpCli,
   isRegistrationMissingError,
   parseRegistrationInfo,
   runCommand,
 } from '../lib/warpCli.js';
 
-const COMMAND_VERSION = '--version';
-const COMMAND_REGISTRATION_SHOW = 'registration show';
+const COMMAND_VERSION = ['--version'];
 const CLI_INFO_LOADING = 'Loading…';
 const CLI_INFO_UNAVAILABLE = 'Unavailable';
 const CLI_INFO_NOT_REGISTERED = 'Not registered';

@@ -12,12 +12,9 @@ const SERVICE_NAME_DEFAULT = 'warp-svc.service';
  * Resolves the systemd service name from settings or falls back to the default.
  */
 export function getServiceName(settings) {
-  if (
-    settings &&
-    settings.get_boolean(Settings.USE_CUSTOM_SERVICE_NAME) &&
-    settings.get_string(Settings.SERVICE_NAME)
-  ) {
-    return settings.get_string(Settings.SERVICE_NAME);
+  if (settings && settings.get_boolean(Settings.USE_CUSTOM_SERVICE_NAME)) {
+    const custom = settings.get_string(Settings.SERVICE_NAME)?.trim();
+    if (custom) return custom;
   }
   return SERVICE_NAME_DEFAULT;
 }
@@ -49,12 +46,12 @@ function resolveServiceBackend(settings) {
  * Dispatches to the configured backend.
  * Returns a Promise that resolves when the command completes.
  */
-export async function runServiceCommand(action, settings) {
+export async function runServiceCommand(action, settings, cancellable = null) {
   const serviceName = getServiceName(settings);
   const backend = resolveServiceBackend(settings);
 
   if (backend === ServiceAuthBackend.SYSTEMD_DBUS) {
-    return runServiceCommandSystemdDbus(action, serviceName);
+    return runServiceCommandSystemdDbus(action, serviceName, cancellable);
   }
 
   // pkexec path — either explicitly selected or resolved by auto
@@ -70,7 +67,7 @@ export async function runServiceCommand(action, settings) {
       settingValue === ServiceAuthBackend.AUTO &&
       err.code === ServiceAuthErrorCode.UNAVAILABLE
     ) {
-      return runServiceCommandSystemdDbus(action, serviceName);
+      return runServiceCommandSystemdDbus(action, serviceName, cancellable);
     }
 
     throw err;

@@ -39,7 +39,11 @@ function isDbusAuthDenied(msg) {
  * Runs a systemctl action via the systemd D-Bus Manager interface.
  * Uses ALLOW_INTERACTIVE_AUTHORIZATION so polkit can prompt the user.
  */
-export async function runServiceCommandSystemdDbus(action, serviceName) {
+export async function runServiceCommandSystemdDbus(
+  action,
+  serviceName,
+  cancellable = null,
+) {
   const methodName = SYSTEMD_METHOD_MAP[action];
   if (!methodName) {
     throw makeServiceAuthError(
@@ -58,7 +62,7 @@ export async function runServiceCommandSystemdDbus(action, serviceName) {
       SYSTEMD_BUS_NAME,
       SYSTEMD_OBJECT_PATH,
       SYSTEMD_MANAGER_IFACE,
-      null,
+      cancellable,
     );
   } catch (e) {
     throw makeServiceAuthError(
@@ -74,7 +78,7 @@ export async function runServiceCommandSystemdDbus(action, serviceName) {
       new GLib.Variant('(ss)', [serviceName, 'replace']),
       Gio.DBusCallFlags.ALLOW_INTERACTIVE_AUTHORIZATION,
       -1,
-      null,
+      cancellable,
     );
   } catch (e) {
     const msg = e.message || String(e);

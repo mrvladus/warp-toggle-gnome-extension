@@ -176,13 +176,17 @@ export function buildWarpCliPage(settings) {
     }
   });
 
-  settings.connect(`changed::${Settings.SERVICE_AUTH_BACKEND}`, () => {
-    const val = settings.get_string(Settings.SERVICE_AUTH_BACKEND);
-    const idx = backendValues.indexOf(val);
-    if (idx >= 0 && authBackendRow.selected !== idx) {
-      authBackendRow.selected = idx;
-    }
-  });
+  const settingsIds = [];
+
+  settingsIds.push(
+    settings.connect(`changed::${Settings.SERVICE_AUTH_BACKEND}`, () => {
+      const val = settings.get_string(Settings.SERVICE_AUTH_BACKEND);
+      const idx = backendValues.indexOf(val);
+      if (idx >= 0 && authBackendRow.selected !== idx) {
+        authBackendRow.selected = idx;
+      }
+    }),
+  );
 
   // --- CLI Info group ---
   const cliInfoGroup = new Adw.PreferencesGroup({
@@ -299,11 +303,23 @@ export function buildWarpCliPage(settings) {
   refreshCliInfo();
 
   // Re-fetch when CLI path settings change
-  settings.connect(`changed::${Settings.USE_CUSTOM_WARP_CLI}`, () => {
-    refreshCliInfo();
-  });
-  settings.connect(`changed::${Settings.CUSTOM_WARP_CLI_PATH}`, () => {
-    refreshCliInfo();
+  settingsIds.push(
+    settings.connect(`changed::${Settings.USE_CUSTOM_WARP_CLI}`, () => {
+      refreshCliInfo();
+    }),
+  );
+  settingsIds.push(
+    settings.connect(`changed::${Settings.CUSTOM_WARP_CLI_PATH}`, () => {
+      refreshCliInfo();
+    }),
+  );
+
+  // Disconnect settings handlers when the page is removed from the widget tree.
+  page.connect('unroot', () => {
+    for (const id of settingsIds) {
+      settings.disconnect(id);
+    }
+    settingsIds.length = 0;
   });
 
   return page;

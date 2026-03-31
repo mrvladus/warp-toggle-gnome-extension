@@ -125,7 +125,11 @@ class WarpQuickItemController {
       }
 
       this._item.menu.addHeaderSuffix(headerButtons);
-      this._item.menu._headerSpacer.x_expand = false;
+      try {
+        this._item.menu._headerSpacer.x_expand = false;
+      } catch (_e) {
+        // _headerSpacer is a private GNOME Shell API; ignore if unavailable.
+      }
       this._syncHeaderButtons(this._stateManager.state);
     } else {
       this._refreshButton = null;

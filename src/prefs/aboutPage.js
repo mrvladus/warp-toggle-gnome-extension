@@ -1,12 +1,13 @@
 import Adw from 'gi://Adw';
+import Gdk from 'gi://Gdk';
 import Gio from 'gi://Gio';
 import Gtk from 'gi://Gtk';
 
 import { gettext as _ } from 'resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js';
 
 const AUTHOR = 'mrvladus';
-const LICENSE = 'GPL-3.0';
-const LICENSE_URL = 'https://www.gnu.org/licenses/gpl-3.0.html';
+const LICENSE = 'GPL-2.0-or-later';
+const LICENSE_URL = 'https://www.gnu.org/licenses/old-licenses/gpl-2.0.html';
 const REPO_URL = 'https://github.com/mrvladus/warp-toggle-gnome-extension';
 const ISSUES_URL = `${REPO_URL}/issues`;
 const CONTRIBUTORS = [
@@ -71,19 +72,18 @@ export function buildAboutPage(ext) {
 
   const versionPill = new Gtk.Label({
     label: _(`v${metadata.version}`),
-    css_classes: ['caption'],
+    css_classes: ['caption', 'pill'],
     halign: Gtk.Align.CENTER,
   });
-  const provider = versionPill.get_style_context();
-  provider.add_class('pill');
   const css = new Gtk.CssProvider();
-  css.load_from_data(
+  css.load_from_string(
     '.pill { background: alpha(@success_color, 0.15); color: @success_color; border-radius: 999px; padding: 4px 14px; font-weight: bold; }',
-    -1,
   );
-  versionPill
-    .get_style_context()
-    .add_provider(css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION);
+  Gtk.StyleContext.add_provider_for_display(
+    Gdk.Display.get_default(),
+    css,
+    Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
+  );
   headerBox.append(versionPill);
 
   headerGroup.add(headerBox);

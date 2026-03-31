@@ -4,7 +4,7 @@ import Gtk from 'gi://Gtk';
 
 import { gettext as _ } from 'resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js';
 
-import { Settings, ServiceAuthBackend } from '../lib/constants.js';
+import { Settings, ServiceAuthBackend } from '../lib/warpTypes.js';
 import {
   COMMAND_REGISTRATION_SHOW,
   getWarpCli,

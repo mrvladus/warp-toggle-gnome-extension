@@ -23,7 +23,7 @@ import * as MessageTray from 'resource:///org/gnome/shell/ui/messageTray.js';
 
 import { Extension } from 'resource:///org/gnome/shell/extensions/extension.js';
 
-import { Settings } from './lib/constants.js';
+import { Settings } from './lib/warpTypes.js';
 import { WARP_CLI_DEFAULT, getWarpCli } from './lib/warpCli.js';
 import { WarpStateManager } from './lib/stateManager.js';
 import { WarpIndicator } from './ui/indicator.js';

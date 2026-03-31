@@ -2,7 +2,7 @@ import {
   Settings,
   ServiceAuthBackend,
   ServiceAuthErrorCode,
-} from '../constants.js';
+} from '../warpTypes.js';
 import { isPkexecAvailable, runServiceCommandPkexec } from './pkexecBackend.js';
 import { runServiceCommandSystemdDbus } from './systemdDbusBackend.js';
 
@@ -23,7 +23,7 @@ export function getServiceName(settings) {
  * Determines which backend to use based on the setting value.
  * For 'auto', checks pkexec availability and falls back to systemd-dbus.
  */
-function resolveServiceBackend(settings) {
+export function resolveServiceBackend(settings) {
   const value = settings
     ? settings.get_string(Settings.SERVICE_AUTH_BACKEND)
     : ServiceAuthBackend.AUTO;

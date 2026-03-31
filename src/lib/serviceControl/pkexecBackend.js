@@ -1,7 +1,7 @@
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 
-import { ServiceAuthBackend, ServiceAuthErrorCode } from '../constants.js';
+import { ServiceAuthBackend, ServiceAuthErrorCode } from '../warpTypes.js';
 import { makeServiceAuthError } from './errors.js';
 
 /**

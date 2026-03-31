@@ -2,7 +2,7 @@ import GObject from 'gi://GObject';
 
 import { SystemIndicator } from 'resource:///org/gnome/shell/ui/quickSettings.js';
 
-import { Settings, IndicatorStates } from '../lib/constants.js';
+import { Settings, IndicatorStates } from '../lib/warpTypes.js';
 import { getStateAppearance } from './stateAppearance.js';
 import { IconAnimator } from './iconAnimator.js';
 

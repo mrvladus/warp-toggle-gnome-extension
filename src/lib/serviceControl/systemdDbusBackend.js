@@ -1,14 +1,14 @@
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 
-import { ServiceAuthBackend, ServiceAuthErrorCode } from '../constants.js';
+import { ServiceAuthBackend, ServiceAuthErrorCode } from '../warpTypes.js';
 import { makeServiceAuthError } from './errors.js';
 
 const SYSTEMD_BUS_NAME = 'org.freedesktop.systemd1';
 const SYSTEMD_OBJECT_PATH = '/org/freedesktop/systemd1';
 const SYSTEMD_MANAGER_IFACE = 'org.freedesktop.systemd1.Manager';
 
-const SYSTEMD_METHOD_MAP = {
+export const SYSTEMD_METHOD_MAP = {
   start: 'StartUnit',
   stop: 'StopUnit',
   restart: 'RestartUnit',
@@ -22,16 +22,16 @@ const DBUS_CANCELLED_MARKERS = [
 ];
 const DBUS_DENIED_MARKERS = ['accessdenied', 'rejected'];
 
-function messageContainsAny(msg, markers) {
+export function messageContainsAny(msg, markers) {
   const lower = msg.toLowerCase();
   return markers.some((m) => lower.includes(m));
 }
 
-function isDbusAuthCancelled(msg) {
+export function isDbusAuthCancelled(msg) {
   return messageContainsAny(msg, DBUS_CANCELLED_MARKERS);
 }
 
-function isDbusAuthDenied(msg) {
+export function isDbusAuthDenied(msg) {
   return messageContainsAny(msg, DBUS_DENIED_MARKERS);
 }
 

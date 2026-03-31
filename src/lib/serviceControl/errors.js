@@ -1,4 +1,4 @@
-import { ServiceAuthErrorCode } from '../constants.js';
+import { ServiceAuthErrorCode } from '../warpTypes.js';
 
 /**
  * Creates a normalized service-auth error.

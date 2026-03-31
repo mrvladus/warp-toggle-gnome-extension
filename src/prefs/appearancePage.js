@@ -4,7 +4,7 @@ import Gtk from 'gi://Gtk';
 
 import { gettext as _ } from 'resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js';
 
-import { Settings, IndicatorStates } from '../lib/constants.js';
+import { Settings, IndicatorStates } from '../lib/warpTypes.js';
 
 export function buildAppearancePage(settings) {
   const page = new Adw.PreferencesPage({

@@ -2,7 +2,7 @@ import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import GObject from 'gi://GObject';
 
-import { Settings, State } from './constants.js';
+import { Settings, State } from './warpTypes.js';
 import { runServiceCommand } from './serviceControl/index.js';
 import {
   COMMAND_CONNECT,

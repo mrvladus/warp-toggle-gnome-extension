@@ -1,4 +1,4 @@
-import { State, IndicatorStates } from '../lib/constants.js';
+import { State, IndicatorStates } from '../lib/warpTypes.js';
 
 export const ICON_DEFAULT = IndicatorStates[State.DISCONNECTED].iconName;
 export const WARP_TITLE = 'WARP';

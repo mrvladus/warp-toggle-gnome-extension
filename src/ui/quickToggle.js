@@ -9,7 +9,7 @@ import {
 } from 'resource:///org/gnome/shell/ui/quickSettings.js';
 import { gettext as _ } from 'resource:///org/gnome/shell/extensions/extension.js';
 
-import { Settings, State, isServiceTransitionState } from '../lib/constants.js';
+import { Settings, State, isServiceTransitionState } from '../lib/warpTypes.js';
 import {
   ICON_DEFAULT,
   WARP_TITLE,

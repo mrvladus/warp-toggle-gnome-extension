@@ -1,7 +1,7 @@
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 
-import { Settings, State } from './constants.js';
+import { Settings, State } from './warpTypes.js';
 
 // cli location
 export const WARP_CLI_DEFAULT = GLib.getenv('WARP_CLI') || 'warp-cli';

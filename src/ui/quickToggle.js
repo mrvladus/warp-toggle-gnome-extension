@@ -1,39 +1,244 @@
+import Clutter from 'gi://Clutter';
 import GObject from 'gi://GObject';
 import Gio from 'gi://Gio';
-import GLib from 'gi://GLib';
+import St from 'gi://St';
 
-import { QuickToggle } from 'resource:///org/gnome/shell/ui/quickSettings.js';
+import {
+  QuickMenuToggle,
+  QuickToggle,
+} from 'resource:///org/gnome/shell/ui/quickSettings.js';
 import { gettext as _ } from 'resource:///org/gnome/shell/extensions/extension.js';
 
-import { Settings, State } from '../lib/constants.js';
-import {
-  COMMAND_CONNECT,
-  COMMAND_DISCONNECT,
-  getWarpCli,
-  runCommand,
-  getVpnProvider,
-  classifyWarpFailure,
-  getWarpState,
-  SUBTITLE_NOT_REGISTERED,
-} from '../lib/warpCli.js';
+import { Settings, State, isServiceTransitionState } from '../lib/constants.js';
 import {
   ICON_DEFAULT,
   WARP_TITLE,
-  ANIMATION_FRAMES,
-  ANIMATION_FRAME_INTERVAL_MS,
   getStateAppearance,
   getStateSubtitle,
 } from './stateAppearance.js';
-
-const STATUS_CHECK_INTERVAL_SECONDS_DEFAULT = 10;
+import { IconAnimator } from './iconAnimator.js';
+import { ServiceMenuController } from './serviceMenu.js';
 
 // registration setup URL
 const URL_SETUP_GUIDE =
   'https://developers.cloudflare.com/warp-client/get-started/linux/';
 
-export const WarpToggle = GObject.registerClass(
-  class WarpToggle extends QuickToggle {
-    constructor(cliAvailable, settings, onStateChange) {
+class WarpQuickItemController {
+  constructor(
+    item,
+    stateManager,
+    settings,
+    { extension = null, withMenu = false } = {},
+  ) {
+    this._item = item;
+    this._stateManager = stateManager;
+    this._settings = settings;
+    this._extension = extension;
+    this._withMenu = withMenu;
+    this._animator = new IconAnimator(item);
+    this._serviceMenu = null;
+    this._refreshButton = null;
+    this._refreshInProgress = false;
+
+    if (this._withMenu) {
+      this._buildMenu();
+    }
+
+    this._stateChangedId = this._stateManager.connect(
+      'state-changed',
+      (_mgr, state) => this._onStateChanged(state),
+    );
+
+    this._animationChangedId = this._settings.connect(
+      `changed::${Settings.ENABLE_CONNECTING_ANIMATION}`,
+      () => {
+        this._animator.syncToState(
+          this._stateManager.state,
+          this._settings.get_boolean(Settings.ENABLE_CONNECTING_ANIMATION),
+        );
+      },
+    );
+
+    this._clickedId = this._item.connect('clicked', () => {
+      const state = this._stateManager.state;
+      if (isServiceTransitionState(state)) return;
+      if (state === State.DISABLED) {
+        if (this._shouldStartServiceOnDisabledClick()) {
+          this._stateManager.serviceAction('start');
+        }
+        return;
+      }
+      if (state === State.NOT_REGISTERED) {
+        this._item.checked = false;
+        Gio.AppInfo.launch_default_for_uri(URL_SETUP_GUIDE, null);
+        return;
+      }
+
+      this._stateManager.toggleConnection(this._item.checked);
+    });
+
+    if (this._stateManager.state !== null) {
+      this._onStateChanged(this._stateManager.state);
+    }
+  }
+
+  _buildMenu() {
+    this._item.menu.setHeader(ICON_DEFAULT, _(WARP_TITLE));
+
+    const showRefreshButton = this._settings.get_boolean(
+      Settings.SHOW_QUICK_SETTINGS_REFRESH_BUTTON,
+    );
+    const showSettingsButton = this._settings.get_boolean(
+      Settings.SHOW_QUICK_SETTINGS_SETTINGS_BUTTON,
+    );
+
+    if (showRefreshButton || showSettingsButton) {
+      const headerButtons = new St.BoxLayout({
+        style: 'spacing: 6px;',
+        x_expand: true,
+        x_align: Clutter.ActorAlign.END,
+      });
+
+      if (showRefreshButton) {
+        this._refreshButton = new St.Button({
+          style_class: 'icon-button',
+          child: new St.Icon({ iconName: 'view-refresh-symbolic' }),
+        });
+        this._refreshButton.connect('clicked', () => {
+          this._handleRefreshClicked();
+        });
+        headerButtons.add_child(this._refreshButton);
+      }
+
+      if (showSettingsButton) {
+        const settingsButton = new St.Button({
+          style_class: 'icon-button',
+          child: new St.Icon({ iconName: 'emblem-system-symbolic' }),
+        });
+        settingsButton.connect('clicked', () => {
+          this._item.menu.close();
+          if (this._extension) {
+            this._extension.openPreferences();
+          }
+        });
+        headerButtons.add_child(settingsButton);
+      }
+
+      this._item.menu.addHeaderSuffix(headerButtons);
+      this._item.menu._headerSpacer.x_expand = false;
+      this._syncHeaderButtons(this._stateManager.state);
+    } else {
+      this._refreshButton = null;
+    }
+
+    this._serviceMenu = new ServiceMenuController(
+      this._item.menu,
+      this._stateManager,
+    );
+  }
+
+  _onStateChanged(state) {
+    const appearance = getStateAppearance(state);
+    this._animator.setStaticIcon(appearance.iconName);
+
+    this._item.toggleMode =
+      state !== State.DISABLED && !isServiceTransitionState(state);
+    this._item.checked = appearance.checked;
+    this._item.subtitle = this._getSubtitle(state);
+
+    if (this._serviceMenu) {
+      this._item.set_reactive(true);
+      this._syncHeaderButtons(state);
+      this._serviceMenu.updateState(state);
+    } else {
+      this._item.set_reactive(this._isMainActionReactive(state));
+    }
+
+    this._animator.syncToState(
+      state,
+      this._settings.get_boolean(Settings.ENABLE_CONNECTING_ANIMATION),
+    );
+  }
+
+  async _handleRefreshClicked() {
+    if (this._refreshInProgress) {
+      return;
+    }
+
+    const state = this._stateManager.state;
+    if (isServiceTransitionState(state)) {
+      return;
+    }
+
+    this._refreshInProgress = true;
+    this._syncHeaderButtons(state);
+
+    try {
+      await this._stateManager.refreshStatus();
+    } finally {
+      this._refreshInProgress = false;
+      this._syncHeaderButtons(this._stateManager.state);
+    }
+  }
+
+  _syncHeaderButtons(state) {
+    if (!this._refreshButton) {
+      return;
+    }
+
+    const reactive =
+      !this._refreshInProgress && !isServiceTransitionState(state);
+    this._refreshButton.set_reactive(reactive);
+    this._refreshButton.can_focus = reactive;
+    this._refreshButton.track_hover = reactive;
+  }
+
+  _shouldStartServiceOnDisabledClick() {
+    return this._settings.get_boolean(Settings.START_SERVICE_ON_DISABLED_CLICK);
+  }
+
+  _isMainActionReactive(state) {
+    if (isServiceTransitionState(state)) {
+      return false;
+    }
+    if (state === State.DISABLED) {
+      return this._shouldStartServiceOnDisabledClick();
+    }
+    return true;
+  }
+
+  _getSubtitle(state) {
+    if (state === State.DISABLED && this._shouldStartServiceOnDisabledClick()) {
+      return _('Service not running · Click to start service');
+    }
+
+    return getStateSubtitle(state) ?? this._stateManager.providerSubtitle;
+  }
+
+  destroy() {
+    this._animator.stop();
+    if (this._clickedId) {
+      this._item.disconnect(this._clickedId);
+      this._clickedId = null;
+    }
+    if (this._stateChangedId) {
+      this._stateManager.disconnect(this._stateChangedId);
+      this._stateChangedId = null;
+    }
+    if (this._animationChangedId) {
+      this._settings.disconnect(this._animationChangedId);
+      this._animationChangedId = null;
+    }
+    if (this._serviceMenu) {
+      this._serviceMenu.destroy();
+      this._serviceMenu = null;
+    }
+  }
+}
+
+export const WarpMenuToggle = GObject.registerClass(
+  class WarpMenuToggle extends QuickMenuToggle {
+    constructor(stateManager, settings, extension) {
       super({
         title: _(WARP_TITLE),
         iconName: ICON_DEFAULT,
@@ -41,254 +246,46 @@ export const WarpToggle = GObject.registerClass(
         checked: false,
       });
 
-      this._onStateChange = onStateChange;
-      this._settings = settings;
-      this._state = null;
-      this._cliAvailable = cliAvailable;
-      this._warpCli = getWarpCli(settings);
-      this._statusCheckId = null; // Store timeout ID
-      this._providerSubtitle = null; // Cached provider label
-      this._animationTimerId = null;
-      this._animationFrameIndex = 0;
-
-      if (!this._cliAvailable) {
-        this._setState(State.DISABLED);
-        return;
-      }
-
-      // Fetch provider label immediately so it shows before the first status poll
-      if (this._settings.get_boolean(Settings.SHOW_ACCOUNT_DETAILS)) {
-        getVpnProvider(this._warpCli)
-          .then((p) => {
-            this._providerSubtitle = p;
-            if (!getStateSubtitle(this._state)) {
-              this.subtitle = p;
-            }
-          })
-          .catch(() => {});
-      }
-
-      this._setState(State.DISCONNECTED);
-      this._updateStatus(); // Initial check
-      this._startCheckingStatus(); // Start periodic updates
-
-      // Toggle connecting animation on/off when the preference changes.
-      this._animationChangedId = this._settings.connect(
-        `changed::${Settings.ENABLE_CONNECTING_ANIMATION}`,
-        () => {
-          if (this._state === State.CONNECTING) {
-            this._stopConnectingAnimation();
-            this._applyConnectingVisual();
-          }
-        },
+      this._controller = new WarpQuickItemController(
+        this,
+        stateManager,
+        settings,
+        { extension, withMenu: true },
       );
-
-      // Restart the polling timer whenever the interval setting changes.
-      this._pollIntervalChangedId = this._settings.connect(
-        `changed::${Settings.POLL_INTERVAL}`,
-        () => {
-          this._stopCheckingStatus();
-          this._startCheckingStatus();
-        },
-      );
-
-      // React to warp-cli path changes.
-      this._warpCliChangedId = this._settings.connect(
-        `changed::${Settings.USE_CUSTOM_WARP_CLI}`,
-        () => this._onWarpCliChanged(),
-      );
-      this._warpCliPathChangedId = this._settings.connect(
-        `changed::${Settings.CUSTOM_WARP_CLI_PATH}`,
-        () => this._onWarpCliChanged(),
-      );
-
-      // Show or clear account details when the preference toggles.
-      this._accountDetailsChangedId = this._settings.connect(
-        `changed::${Settings.SHOW_ACCOUNT_DETAILS}`,
-        () => {
-          if (this._settings.get_boolean(Settings.SHOW_ACCOUNT_DETAILS)) {
-            getVpnProvider(this._warpCli)
-              .then((p) => {
-                this._providerSubtitle = p;
-                if (!getStateSubtitle(this._state)) {
-                  this.subtitle = p;
-                }
-              })
-              .catch(() => {});
-          } else {
-            this._providerSubtitle = null;
-            if (!getStateSubtitle(this._state)) {
-              this.subtitle = null;
-            }
-          }
-        },
-      );
-
-      // Monitor button state changes
-      this.connect('clicked', async () => {
-        if (this._notRegistered) {
-          this.checked = false;
-          Gio.AppInfo.launch_default_for_uri(URL_SETUP_GUIDE, null);
-          return;
-        }
-
-        const command = this.checked ? COMMAND_CONNECT : COMMAND_DISCONNECT;
-        this._setState(
-          command === COMMAND_CONNECT ? State.CONNECTING : State.DISCONNECTED,
-        );
-
-        try {
-          await runCommand(command, this._warpCli);
-        } catch (err) {
-          this._setState(classifyWarpFailure(err));
-          return;
-        }
-
-        await this._updateStatus();
-      });
-    }
-
-    _applyConnectingVisual() {
-      if (
-        this._settings &&
-        this._settings.get_boolean(Settings.ENABLE_CONNECTING_ANIMATION)
-      ) {
-        this._startConnectingAnimation();
-      } else {
-        const appearance = getStateAppearance(State.CONNECTING);
-        this.iconName = appearance.iconName;
-        if (this._onStateChange) {
-          this._onStateChange(appearance);
-        }
-      }
-    }
-
-    _startConnectingAnimation() {
-      if (this._animationTimerId !== null) return;
-      this._animationFrameIndex = 0;
-      const tick = () => {
-        const iconName = ANIMATION_FRAMES[this._animationFrameIndex];
-        this.iconName = iconName;
-        if (this._onStateChange) {
-          this._onStateChange({ iconName, state: State.CONNECTING });
-        }
-        this._animationFrameIndex =
-          (this._animationFrameIndex + 1) % ANIMATION_FRAMES.length;
-        return GLib.SOURCE_CONTINUE;
-      };
-      tick();
-      this._animationTimerId = GLib.timeout_add(
-        GLib.PRIORITY_DEFAULT,
-        ANIMATION_FRAME_INTERVAL_MS,
-        tick,
-      );
-    }
-
-    _stopConnectingAnimation() {
-      if (this._animationTimerId !== null) {
-        GLib.source_remove(this._animationTimerId);
-        this._animationTimerId = null;
-      }
-      this._animationFrameIndex = 0;
-    }
-
-    _setState(state) {
-      if (this._state === state) {
-        return;
-      }
-
-      this._stopConnectingAnimation();
-      this._state = state;
-      const appearance = getStateAppearance(state);
-      if (state !== State.CONNECTING) {
-        this.iconName = appearance.iconName;
-      }
-      this.checked = appearance.checked;
-      // QuickToggle is a Clutter actor; `reactive` controls whether it accepts pointer input.
-      this.reactive = state !== State.DISABLED;
-      this._notRegistered = state === State.NOT_REGISTERED;
-      // Error-like states show their own subtitle; normal states restore the provider label.
-      this.subtitle = getStateSubtitle(state) ?? this._providerSubtitle;
-
-      if (state === State.CONNECTING) {
-        this._applyConnectingVisual();
-      } else if (this._onStateChange) {
-        this._onStateChange(appearance);
-      }
-    }
-
-    _onWarpCliChanged() {
-      this._warpCli = getWarpCli(this._settings);
-      this._stopCheckingStatus();
-      this._updateStatus();
-      this._startCheckingStatus();
-    }
-
-    async _updateStatus() {
-      try {
-        const showAccount = this._settings
-          ? this._settings.get_boolean(Settings.SHOW_ACCOUNT_DETAILS)
-          : true;
-        const [state, provider] = await Promise.all([
-          getWarpState(this._warpCli),
-          showAccount ? getVpnProvider(this._warpCli) : Promise.resolve(null),
-        ]);
-        if (provider === SUBTITLE_NOT_REGISTERED && state !== State.DISABLED) {
-          this._providerSubtitle = null;
-          this._setState(State.NOT_REGISTERED);
-        } else {
-          this._providerSubtitle = provider;
-          this._setState(state);
-        }
-      } catch (err) {
-        this._setState(classifyWarpFailure(err));
-      }
-    }
-
-    _startCheckingStatus() {
-      if (this._statusCheckId) return; // Prevent duplicate timers
-      const interval = this._settings
-        ? this._settings.get_int(Settings.POLL_INTERVAL)
-        : STATUS_CHECK_INTERVAL_SECONDS_DEFAULT;
-      this._statusCheckId = GLib.timeout_add_seconds(
-        GLib.PRIORITY_DEFAULT,
-        interval,
-        () => {
-          this._updateStatus();
-          return GLib.SOURCE_CONTINUE;
-        },
-      );
-    }
-
-    _stopCheckingStatus() {
-      if (this._statusCheckId) {
-        GLib.source_remove(this._statusCheckId);
-        this._statusCheckId = null;
-      }
     }
 
     destroy() {
-      this._stopConnectingAnimation();
-      this._stopCheckingStatus();
-      if (this._animationChangedId) {
-        this._settings.disconnect(this._animationChangedId);
-        this._animationChangedId = null;
+      if (this._controller) {
+        this._controller.destroy();
+        this._controller = null;
       }
-      if (this._pollIntervalChangedId) {
-        this._settings.disconnect(this._pollIntervalChangedId);
-        this._pollIntervalChangedId = null;
-      }
-      if (this._accountDetailsChangedId) {
-        this._settings.disconnect(this._accountDetailsChangedId);
-        this._accountDetailsChangedId = null;
-      }
-      if (this._warpCliChangedId) {
-        this._settings.disconnect(this._warpCliChangedId);
-        this._warpCliChangedId = null;
-      }
-      if (this._warpCliPathChangedId) {
-        this._settings.disconnect(this._warpCliPathChangedId);
-        this._warpCliPathChangedId = null;
+      super.destroy();
+    }
+  },
+);
+
+export const WarpQuickButton = GObject.registerClass(
+  class WarpQuickButton extends QuickToggle {
+    constructor(stateManager, settings) {
+      super({
+        title: _(WARP_TITLE),
+        iconName: ICON_DEFAULT,
+        toggleMode: true,
+        checked: false,
+      });
+
+      this._controller = new WarpQuickItemController(
+        this,
+        stateManager,
+        settings,
+        { withMenu: false },
+      );
+    }
+
+    destroy() {
+      if (this._controller) {
+        this._controller.destroy();
+        this._controller = null;
       }
       super.destroy();
     }

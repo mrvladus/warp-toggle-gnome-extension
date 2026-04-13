@@ -47,10 +47,35 @@
       <summary>Show indicator when not registered</summary>
       <description>Show the status indicator when WARP is not registered.</description>
     </key>
+    <key name="indicator-service-busy" type="b">
+      <default>true</default>
+      <summary>Show indicator during service activity</summary>
+      <description>Show the status indicator while a service action (start/stop/restart) is in progress.</description>
+    </key>
     <key name="show-account-details" type="b">
       <default>true</default>
       <summary>Show account details</summary>
       <description>Fetch and display the registered account or organisation name in the toggle subtitle.</description>
+    </key>
+    <key name="enable-quick-settings-dropdown" type="b">
+      <default>true</default>
+      <summary>Enable quick settings dropdown</summary>
+      <description>Whether the quick settings tile should show its dropdown menu with service controls.</description>
+    </key>
+    <key name="start-service-on-disabled-click" type="b">
+      <default>false</default>
+      <summary>Start service from disabled tile click</summary>
+      <description>Whether clicking the quick settings tile while the WARP service is not running should start the systemd service directly.</description>
+    </key>
+    <key name="show-quick-settings-refresh-button" type="b">
+      <default>true</default>
+      <summary>Show dropdown refresh button</summary>
+      <description>Whether the quick settings dropdown should include a shortcut button that refreshes the WARP status immediately.</description>
+    </key>
+    <key name="show-quick-settings-settings-button" type="b">
+      <default>true</default>
+      <summary>Show dropdown settings button</summary>
+      <description>Whether the quick settings dropdown should include a shortcut button that opens the extension preferences.</description>
     </key>
     <key name="use-custom-warp-cli" type="b">
       <default>false</default>
@@ -72,6 +97,16 @@
       <default>10</default>
       <summary>Status polling interval</summary>
       <description>How often (in seconds) the extension checks the WARP connection status.</description>
+    </key>
+    <key name="use-custom-service-name" type="b">
+      <default>false</default>
+      <summary>Use custom service name</summary>
+      <description>Whether to use a custom systemd service name instead of the default warp-svc.service.</description>
+    </key>
+    <key name="service-name" type="s">
+      <default>'warp-svc.service'</default>
+      <summary>Systemd service name</summary>
+      <description>The name of the systemd service unit used to start and stop the WARP daemon.</description>
     </key>
   </schema>
 </schemalist>

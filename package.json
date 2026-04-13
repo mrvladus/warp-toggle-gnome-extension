@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "./build zip",
+    "build": "./build",
     "build:install": "./build install",
     "build:uninstall": "./build uninstall",
     "build:zip": "./build zip",
@@ -11,6 +11,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "dev": "./build install && WARP_CLI=$(pwd)/mock-warp-cli dbus-run-session -- gnome-shell --devkit",
+    "dev:real": "./build install && dbus-run-session -- gnome-shell --devkit",
     "prefs": "gnome-extensions prefs warptoggle@mrvladus.github.io",
     "mock:show": "./mock-warp-cli show",
     "mock:connected": "./mock-warp-cli set-state connected",

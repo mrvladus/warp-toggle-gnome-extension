@@ -32,7 +32,7 @@ _read_state() {
   if [[ -f "$STATE_FILE" ]]; then
     cat "$STATE_FILE"
   else
-    echo "disconnected"
+    echo "disabled"
   fi
 }
 

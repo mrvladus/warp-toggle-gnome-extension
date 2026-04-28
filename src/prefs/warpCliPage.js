@@ -315,7 +315,7 @@ export function buildWarpCliPage(settings) {
   );
 
   // Disconnect settings handlers when the page is removed from the widget tree.
-  page.connect('unroot', () => {
+  page.connect('unrealize', () => {
     for (const id of settingsIds) {
       settings.disconnect(id);
     }

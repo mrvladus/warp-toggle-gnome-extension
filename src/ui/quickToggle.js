@@ -9,7 +9,7 @@ import {
 } from 'resource:///org/gnome/shell/ui/quickSettings.js';
 import { gettext as _ } from 'resource:///org/gnome/shell/extensions/extension.js';
 
-import { Settings, State, isServiceTransitionState } from '../lib/constants.js';
+import { Settings, State, isServiceTransitionState } from '../lib/warpTypes.js';
 import {
   ICON_DEFAULT,
   WARP_TITLE,
@@ -125,7 +125,11 @@ class WarpQuickItemController {
       }
 
       this._item.menu.addHeaderSuffix(headerButtons);
-      this._item.menu._headerSpacer.x_expand = false;
+      try {
+        this._item.menu._headerSpacer.x_expand = false;
+      } catch (_e) {
+        // _headerSpacer is a private GNOME Shell API; ignore if unavailable.
+      }
       this._syncHeaderButtons(this._stateManager.state);
     } else {
       this._refreshButton = null;

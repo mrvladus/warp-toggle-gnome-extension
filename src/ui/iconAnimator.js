@@ -1,6 +1,6 @@
 import GLib from 'gi://GLib';
 
-import { isLoadingState } from '../lib/constants.js';
+import { isLoadingState } from '../lib/warpTypes.js';
 import {
   ANIMATION_FRAMES,
   ANIMATION_FRAME_INTERVAL_MS,

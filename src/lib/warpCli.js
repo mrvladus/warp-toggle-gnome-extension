@@ -1,17 +1,17 @@
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 
-import { Settings, State } from './constants.js';
+import { Settings, State } from './warpTypes.js';
 
 // cli location
 export const WARP_CLI_DEFAULT = GLib.getenv('WARP_CLI') || 'warp-cli';
 
-// command parameters
-export const COMMAND_CONNECT = 'connect';
-export const COMMAND_DISCONNECT = 'disconnect';
-const COMMAND_STATUS = 'status';
-const COMMAND_REGISTRATION_ORG = 'registration organization';
-const COMMAND_REGISTRATION_SHOW = 'registration show';
+// command parameters (arrays to avoid split-on-space pitfalls)
+export const COMMAND_CONNECT = ['connect'];
+export const COMMAND_DISCONNECT = ['disconnect'];
+const COMMAND_STATUS = ['status'];
+export const COMMAND_REGISTRATION_ORG = ['registration', 'organization'];
+export const COMMAND_REGISTRATION_SHOW = ['registration', 'show'];
 
 const REGISTRATION_INFO_PATTERNS = [
   {
@@ -61,27 +61,30 @@ const OFFLINE_ERROR_PATTERNS = ['offline', 'timed out'];
 
 // Resolves the warp-cli executable path from settings or falls back to the default.
 export function getWarpCli(settings) {
-  if (
-    settings &&
-    settings.get_boolean(Settings.USE_CUSTOM_WARP_CLI) &&
-    settings.get_string(Settings.CUSTOM_WARP_CLI_PATH)
-  ) {
-    return settings.get_string(Settings.CUSTOM_WARP_CLI_PATH);
+  if (settings && settings.get_boolean(Settings.USE_CUSTOM_WARP_CLI)) {
+    const custom = settings.get_string(Settings.CUSTOM_WARP_CLI_PATH)?.trim();
+    if (custom) return custom;
   }
   return WARP_CLI_DEFAULT;
 }
 
 // Executes a warp-cli command and returns its stdout output.
-export async function runCommand(cmd, warpCli = WARP_CLI_DEFAULT) {
+// `args` must be an array of argument strings, e.g. ['status'].
+// `cancellable` is an optional Gio.Cancellable to abort the operation.
+export async function runCommand(
+  args,
+  warpCli = WARP_CLI_DEFAULT,
+  cancellable = null,
+) {
   return new Promise((resolve, reject) => {
     try {
       const proc = new Gio.Subprocess({
-        argv: [warpCli, ...cmd.split(' ')],
+        argv: [warpCli, ...args],
         flags:
           Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE,
       });
-      proc.init(null);
-      proc.communicate_utf8_async(null, null, (proc, res) => {
+      proc.init(cancellable);
+      proc.communicate_utf8_async(null, cancellable, (proc, res) => {
         try {
           let [ok, stdout, stderr] = proc.communicate_utf8_finish(res);
           if (!ok || proc.get_exit_status() !== 0) {
@@ -131,9 +134,13 @@ export function parseRegistrationInfo(info) {
 // Returns a prefixed string: "Org: <name>" or "Acc: <name>",
 // SUBTITLE_NOT_REGISTERED when no account is linked yet, or null when no
 // identifiable info is available.
-export async function getVpnProvider(warpCli) {
+export async function getVpnProvider(warpCli, cancellable = null) {
   try {
-    const org = await runCommand(COMMAND_REGISTRATION_ORG, warpCli);
+    const org = await runCommand(
+      COMMAND_REGISTRATION_ORG,
+      warpCli,
+      cancellable,
+    );
     if (org) {
       return SUBTITLE_PREFIX_ORG + org;
     }
@@ -145,7 +152,11 @@ export async function getVpnProvider(warpCli) {
   }
 
   try {
-    const info = await runCommand(COMMAND_REGISTRATION_SHOW, warpCli);
+    const info = await runCommand(
+      COMMAND_REGISTRATION_SHOW,
+      warpCli,
+      cancellable,
+    );
     const registrationInfo = parseRegistrationInfo(info);
     if (registrationInfo.type === 'organization' && registrationInfo.detail) {
       return SUBTITLE_PREFIX_ORG + registrationInfo.detail;
@@ -170,6 +181,8 @@ export function parseWarpStatus(statusOutput) {
   }
 
   const status = statusOutput.toLowerCase();
+  // IMPORTANT: Check 'disconnected' before 'connected' —
+  // 'connected' is a substring of 'disconnected'.
   if (status.includes(STATUS_DISCONNECTED)) {
     return State.DISCONNECTED;
   }
@@ -209,9 +222,9 @@ export function classifyWarpFailure(err) {
 
 // Runs `warp-cli status` and returns the parsed State.* value.
 // Never throws — classifies CLI failures into a State.* value.
-export async function getWarpState(warpCli) {
+export async function getWarpState(warpCli, cancellable = null) {
   try {
-    const status = await runCommand(COMMAND_STATUS, warpCli);
+    const status = await runCommand(COMMAND_STATUS, warpCli, cancellable);
     return parseWarpStatus(status);
   } catch (err) {
     return classifyWarpFailure(err);

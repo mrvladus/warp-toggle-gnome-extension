@@ -1,6 +1,6 @@
 import { gettext as _ } from 'resource:///org/gnome/shell/extensions/extension.js';
 
-import { State, isServiceTransitionState } from '../lib/constants.js';
+import { State, isServiceTransitionState } from '../lib/warpTypes.js';
 
 /**
  * Service Start/Stop toggle and Restart menu items.

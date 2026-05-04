@@ -3,7 +3,7 @@ import Gio from 'gi://Gio';
 
 import { gettext as _ } from 'resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js';
 
-import { Settings } from '../lib/constants.js';
+import { Settings } from '../lib/warpTypes.js';
 
 export function buildQuickSettingsPage(settings) {
   const page = new Adw.PreferencesPage({

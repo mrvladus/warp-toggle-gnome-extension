@@ -4,16 +4,16 @@ import Gtk from 'gi://Gtk';
 
 import { gettext as _ } from 'resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js';
 
-import { Settings } from '../lib/constants.js';
+import { Settings, ServiceAuthBackend } from '../lib/warpTypes.js';
 import {
+  COMMAND_REGISTRATION_SHOW,
   getWarpCli,
   isRegistrationMissingError,
   parseRegistrationInfo,
   runCommand,
 } from '../lib/warpCli.js';
 
-const COMMAND_VERSION = '--version';
-const COMMAND_REGISTRATION_SHOW = 'registration show';
+const COMMAND_VERSION = ['--version'];
 const CLI_INFO_LOADING = 'Loading…';
 const CLI_INFO_UNAVAILABLE = 'Unavailable';
 const CLI_INFO_NOT_REGISTERED = 'Not registered';
@@ -147,6 +147,47 @@ export function buildWarpCliPage(settings) {
     Gio.SettingsBindFlags.GET,
   );
 
+  const authBackendModel = new Gtk.StringList();
+  authBackendModel.append(_('Auto'));
+  authBackendModel.append(_('pkexec'));
+  authBackendModel.append(_('systemd D-Bus'));
+
+  const backendValues = [
+    ServiceAuthBackend.AUTO,
+    ServiceAuthBackend.PKEXEC,
+    ServiceAuthBackend.SYSTEMD_DBUS,
+  ];
+
+  const currentBackend = settings.get_string(Settings.SERVICE_AUTH_BACKEND);
+  const initialIndex = Math.max(0, backendValues.indexOf(currentBackend));
+
+  const authBackendRow = new Adw.ComboRow({
+    title: _('Authentication backend'),
+    subtitle: _('How the extension escalates privileges for service control'),
+    model: authBackendModel,
+    selected: initialIndex,
+  });
+  serviceGroup.add(authBackendRow);
+
+  authBackendRow.connect('notify::selected', () => {
+    const idx = authBackendRow.selected;
+    if (idx >= 0 && idx < backendValues.length) {
+      settings.set_string(Settings.SERVICE_AUTH_BACKEND, backendValues[idx]);
+    }
+  });
+
+  const settingsIds = [];
+
+  settingsIds.push(
+    settings.connect(`changed::${Settings.SERVICE_AUTH_BACKEND}`, () => {
+      const val = settings.get_string(Settings.SERVICE_AUTH_BACKEND);
+      const idx = backendValues.indexOf(val);
+      if (idx >= 0 && authBackendRow.selected !== idx) {
+        authBackendRow.selected = idx;
+      }
+    }),
+  );
+
   // --- CLI Info group ---
   const cliInfoGroup = new Adw.PreferencesGroup({
     title: _('CLI Info'),
@@ -262,11 +303,23 @@ export function buildWarpCliPage(settings) {
   refreshCliInfo();
 
   // Re-fetch when CLI path settings change
-  settings.connect(`changed::${Settings.USE_CUSTOM_WARP_CLI}`, () => {
-    refreshCliInfo();
-  });
-  settings.connect(`changed::${Settings.CUSTOM_WARP_CLI_PATH}`, () => {
-    refreshCliInfo();
+  settingsIds.push(
+    settings.connect(`changed::${Settings.USE_CUSTOM_WARP_CLI}`, () => {
+      refreshCliInfo();
+    }),
+  );
+  settingsIds.push(
+    settings.connect(`changed::${Settings.CUSTOM_WARP_CLI_PATH}`, () => {
+      refreshCliInfo();
+    }),
+  );
+
+  // Disconnect settings handlers when the page is removed from the widget tree.
+  page.connect('unrealize', () => {
+    for (const id of settingsIds) {
+      settings.disconnect(id);
+    }
+    settingsIds.length = 0;
   });
 
   return page;

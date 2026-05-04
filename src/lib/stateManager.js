@@ -1,8 +1,9 @@
-import GObject from 'gi://GObject';
+import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
+import GObject from 'gi://GObject';
 
-import { Settings, State } from './constants.js';
-import { runServiceCommand } from './serviceControl.js';
+import { Settings, State } from './warpTypes.js';
+import { runServiceCommand } from './serviceControl/index.js';
 import {
   COMMAND_CONNECT,
   COMMAND_DISCONNECT,
@@ -35,6 +36,7 @@ export const WarpStateManager = GObject.registerClass(
       this._statusRefreshPromise = null;
       this._pendingServiceAction = null;
       this._settingsIds = [];
+      this._cancellable = new Gio.Cancellable();
 
       if (!this._cliAvailable) {
         this._setState(State.DISABLED);
@@ -111,7 +113,7 @@ export const WarpStateManager = GObject.registerClass(
       );
 
       try {
-        await runCommand(command, this._warpCli);
+        await runCommand(command, this._warpCli, this._cancellable);
       } catch (err) {
         this._setState(classifyWarpFailure(err));
         return;
@@ -130,18 +132,19 @@ export const WarpStateManager = GObject.registerClass(
       this._setState(stateMap[action]);
 
       try {
-        await runServiceCommand(action, this._settings);
+        await runServiceCommand(action, this._settings, this._cancellable);
         // Let the existing periodic poll resolve the transition state.
         // _updateStatus() will ignore stale results while the action is pending.
       } catch (err) {
         this._pendingServiceAction = null;
-        if (!err.cancelled) {
-          this._setState(State.ERROR);
-        } else {
+        if (err.cancelled) {
           // pkexec cancelled — revert to real state.
           this._state = null;
-          await this.refreshStatus();
+        } else {
+          this._setState(State.ERROR, err.message);
         }
+        // In both cases, immediately refresh to recover the real state.
+        await this.refreshStatus();
       }
     }
 
@@ -170,7 +173,7 @@ export const WarpStateManager = GObject.registerClass(
     async _refreshStatus() {
       try {
         const [state, provider] = await Promise.all([
-          getWarpState(this._warpCli),
+          getWarpState(this._warpCli, this._cancellable),
           this._fetchProvider(),
         ]);
 
@@ -214,7 +217,7 @@ export const WarpStateManager = GObject.registerClass(
         return null;
       }
       try {
-        return await getVpnProvider(this._warpCli);
+        return await getVpnProvider(this._warpCli, this._cancellable);
       } catch {
         return this._providerSubtitle;
       }
@@ -258,6 +261,7 @@ export const WarpStateManager = GObject.registerClass(
     }
 
     destroy() {
+      this._cancellable.cancel();
       this._stopCheckingStatus();
       for (const id of this._settingsIds) {
         this._settings.disconnect(id);

@@ -26,6 +26,13 @@ export const Settings = {
   ENABLE_CONNECTING_ANIMATION: 'enable-connecting-animation',
   USE_CUSTOM_SERVICE_NAME: 'use-custom-service-name',
   SERVICE_NAME: 'service-name',
+  SERVICE_AUTH_BACKEND: 'service-auth-backend',
+};
+
+export const ServiceAuthBackend = {
+  AUTO: 'auto',
+  PKEXEC: 'pkexec',
+  SYSTEMD_DBUS: 'systemd-dbus',
 };
 
 // Per-state indicator settings keys and display metadata, keyed by state name.
@@ -111,3 +118,10 @@ export function isServiceTransitionState(state) {
 export function isLoadingState(state) {
   return state === State.CONNECTING || isServiceTransitionState(state);
 }
+
+export const ServiceAuthErrorCode = {
+  CANCELLED: 'cancelled',
+  DENIED: 'denied',
+  UNAVAILABLE: 'unavailable',
+  FAILED: 'failed',
+};
